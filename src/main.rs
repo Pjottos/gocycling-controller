@@ -4,7 +4,7 @@
 use core::panic::PanicInfo;
 
 #[no_mangle]
-extern fn _start() {
+extern fn main() {
     loop {
 
     }
