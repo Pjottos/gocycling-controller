@@ -1,5 +1,7 @@
 #!/bin/bash
 
+TARGET_DIR=target/thumbv6m-none-eabi/release
+
 cargo build --release
-echo "Creating kernel.img..."
-llvm-objcopy target/bcm2835/release/gocycling-controller -O binary target/bcm2835/release/kernel.img
+echo "Creating uf2..."
+elf2uf2 $TARGET_DIR/gocycling-controller $TARGET_DIR/gocycling-controller.uf2

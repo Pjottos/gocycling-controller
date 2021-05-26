@@ -1,5 +1,8 @@
 [build]
-target = "bcm2835.json"
+target = "thumbv6m-none-eabi"
 
-[unstable]
-build-std = ["core"]
+[target.'cfg(all(target_arch = "arm", target_os = "none"))']
+rustflags = [
+    "-C", "link-arg=-nmagic",
+    "-C", "link-arg=-Tlink.x",
+]
