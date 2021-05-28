@@ -1,8 +1,10 @@
 #![no_std]
 
-use rpi_pico_sdk_sys::*;
-
+use binding::*;
 use core::panic::PanicInfo;
+
+mod binding;
+mod ctypes;
 
 #[no_mangle]
 pub unsafe extern "C" fn main() -> ! {
@@ -12,19 +14,10 @@ pub unsafe extern "C" fn main() -> ! {
     const TX_PIN: u32 = 0;
     const RX_PIN: u32 = 1;
 
-    // uart_init(uart0, BAUD_RATE);
-
-    gpio_set_function(TX_PIN, GPIO_FUNC_UART);
-    gpio_set_function(RX_PIN, GPIO_FUNC_UART);
-
-    gpio_init(PIN_LED);
-    gpio_set_dir(PIN_LED, GPIO_OUT);
+    let uart = init_uart0(BAUD_RATE, TX_PIN, RX_PIN);
 
     loop {
-        gpio_put(PIN_LED, true);
-        sleep_ms(500);
-        gpio_put(PIN_LED, false);
-        sleep_ms(500);
+        print_uart0(uart, b"AAAAAAAA\0".as_ptr());
     }
 }
 

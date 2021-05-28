@@ -11,7 +11,10 @@ crate-type = ["staticlib"]
 
 
 [dependencies]
-rpi-pico-sdk-sys = { path = "pico-rust-playground/pico-sdk-sys" }
+
+
+[build-dependencies]
+bindgen = "0.58"
 
 
 [profile.release]
