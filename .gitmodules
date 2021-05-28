@@ -1,3 +1,6 @@
 [submodule "pico-sdk"]
 	path = pico-sdk
 	url = https://github.com/raspberrypi/pico-sdk.git
+[submodule "pico-rust-playground"]
+	path = pico-rust-playground
+	url = git@github.com:Pjottos/pico-rust-playground.git
