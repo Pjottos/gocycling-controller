@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
 
-extern "C" void *init_uart0(unsigned int baud_rate, unsigned int tx_pin, unsigned int rx_pin);
-extern "C" void print_uart(void* uart, const char *str);
+extern "C" void *binding_uart0_init(uint32_t baud_rate, uint32_t tx_pin, uint32_t rx_pin);
+extern "C" void binding_uart_destroy(void* uart);
+extern "C" void binding_uart_write_blocking(void* uart, const uint8_t *data, uint32_t len);
