@@ -1,5 +1,5 @@
 add_library(pico_binding
-    pico_inline.c
+    pico_inline.cpp
 )
 
 target_link_libraries(pico_binding

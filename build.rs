@@ -5,7 +5,7 @@ fn main() {
     println!("cargo:rerun-if-changed=pico-binding,pico-sdk");
 
     let bindings = bindgen::Builder::default()
-        .header("pico-binding/wrapper.h")
+        .header("pico-binding/wrapper.hpp")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .prepend_enum_name(false)
         .layout_tests(false)

@@ -1,4 +1,4 @@
-#include "wrapper.h"
+#include "wrapper.hpp"
 
 #include "boards/pico.h"
 #include "pico/stdio.h"
@@ -13,12 +13,13 @@ void *init_uart0(unsigned int baud_rate, unsigned int tx_pin, unsigned int rx_pi
     gpio_set_function(rx_pin, GPIO_FUNC_UART);
 
     uart_set_hw_flow(uart0, false, false);
+    uart_set_format(uart0, 8, 1, UART_PARITY_NONE);
 
     return uart0;
 }
 
 
-void print_uart0(void *uart, const char *str) {
-    uart_puts(uart0, str);
+void print_uart(void *uart, const char *str) {
+    uart_puts((uart_inst_t *)uart, str);
 }
 

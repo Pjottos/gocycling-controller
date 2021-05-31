@@ -2,6 +2,7 @@
 
 use binding::*;
 use core::panic::PanicInfo;
+use rpi_pico_sdk_sys::*;
 
 mod binding;
 mod ctypes;
@@ -17,7 +18,8 @@ pub unsafe extern "C" fn main() -> ! {
     let uart = init_uart0(BAUD_RATE, TX_PIN, RX_PIN);
 
     loop {
-        print_uart0(uart, b"AAAAAAAA\0".as_ptr());
+        print_uart(uart, b"what\0".as_ptr());
+        sleep_ms(1000);
     }
 }
 
