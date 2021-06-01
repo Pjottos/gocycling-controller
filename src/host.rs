@@ -5,6 +5,8 @@ use crate::{
 };
 use core::convert::TryFrom;
 
+static mut UART_CREATED: bool = false;
+
 pub struct Connection {
     uart_dev: *mut c_void,
 }
@@ -15,8 +17,16 @@ impl Connection {
     const RX_PIN: u32 = 1;
 
     /// Creates the connection, returning None if a connection was already created
-    pub fn new() -> Option<Self> {
-        let uart_dev = unsafe { binding_uart0_init(Self::BAUD_RATE, Self::TX_PIN, Self::RX_PIN) };
+    /// # Safety
+    /// This function is not thread safe as it uses non-atomic operations to check whether a device was already created.
+    pub unsafe fn new() -> Option<Self> {
+        if UART_CREATED {
+            return None;
+        }
+
+        let uart_dev = binding_uart0_init(Self::BAUD_RATE, Self::TX_PIN, Self::RX_PIN);
+
+        UART_CREATED = true;
         
         Some(Connection {
             uart_dev,
@@ -37,6 +47,7 @@ impl Drop for Connection {
     fn drop(&mut self) {
         unsafe { 
             binding_uart_destroy(self.uart_dev);
+            UART_CREATED = false;
         }
     }
 }

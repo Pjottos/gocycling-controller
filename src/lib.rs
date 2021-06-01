@@ -15,14 +15,16 @@ const MAGNET_PIN: u32 = 2;
 
 #[no_mangle]
 pub extern "C" fn main() -> ! {
-    let conn = host::Connection::new().unwrap();
+    let conn = unsafe { host::Connection::new().unwrap() };
 
     unsafe { init_magnet_sensor(); }
     let mut last_cycle_time = unsafe { time_us_64() };
 
     loop {
         unsafe {
-            asm!("wfi");
+            // asm!("wfi");
+            // TODO: temporary until magnet sensor is figured out
+            sleep_ms(1000);
             let delta = time_us_64() - last_cycle_time;
             last_cycle_time = time_us_64();
             let data = CycleData { micros: delta as u32 };
