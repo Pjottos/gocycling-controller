@@ -11,7 +11,9 @@ mod ctypes;
 mod host;
 mod cycling;
 
+const ONBOARD_LED_PIN: u32 = 25;
 const MAGNET_PIN: u32 = 2;
+
 
 #[no_mangle]
 pub extern "C" fn main() -> ! {
@@ -35,6 +37,11 @@ pub extern "C" fn main() -> ! {
 
 #[panic_handler]
 fn handle_panic(_info: &PanicInfo) -> ! {
+    unsafe {
+        gpio_set_function(ONBOARD_LED_PIN, GPIO_OUT);
+        gpio_put(ONBOARD_LED_PIN, true);
+    }
+
     loop {}
 }
 
