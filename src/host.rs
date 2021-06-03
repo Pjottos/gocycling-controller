@@ -3,7 +3,6 @@ use crate::{
     ctypes::c_void,
     cycling::CycleData,
 };
-use core::convert::TryFrom;
 
 static mut UART_CREATED: bool = false;
 
@@ -34,10 +33,17 @@ impl Connection {
     }
 
     pub fn push(&self, data: &CycleData) -> Result<(), postcard::Error> {
-        let mut buf = [0u8; 32];
-        let used = postcard::to_slice(data, &mut buf)?;
+        let mut buf = [0u8; 20];
+        let (buf_crc, buf_data) = buf.split_at_mut(1);
+        let used = postcard::to_slice(data, buf_data)?;
 
-        unsafe { binding_uart_write_blocking(self.uart_dev, used.as_ptr(), u32::try_from(used.len()).unwrap()) }
+        buf_crc[0] = calc_crc8(used);
+        let len = 1 + used.len();
+        unsafe { binding_uart_write_blocking(
+            self.uart_dev,
+            buf[0..len].as_ptr(),
+            len as u32,
+        ); }
 
         Ok(())
     }
@@ -50,5 +56,24 @@ impl Drop for Connection {
             UART_CREATED = false;
         }
     }
+}
+
+
+fn calc_crc8(data: &[u8]) -> u8 {
+    let mut crc = 0xFF;
+
+    for val in data.iter().copied() {
+        crc ^= val;
+        for _ in 0..8 {
+            if (crc & 0x80) != 0 {
+                crc = (crc << 1) ^ 0x31;
+            }
+            else {
+                crc <<= 1;
+            }
+        }
+    }
+
+    crc
 }
 
