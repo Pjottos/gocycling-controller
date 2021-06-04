@@ -25,3 +25,7 @@ void binding_uart_destroy(void *uart) {
 void binding_uart_write_blocking(void *uart, const uint8_t *data, uint32_t len) {
     uart_write_blocking((uart_inst_t *)uart, data, len);
 }
+
+void binding_uart_read_blocking(void *uart, uint8_t *data, uint32_t len) {
+    uart_read_blocking((uart_inst_t *)uart, data, len);
+}

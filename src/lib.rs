@@ -1,7 +1,10 @@
 #![no_std]
 #![feature(asm)]
 
-use crate::cycling::CycleData;
+use crate::{
+    cycling::CycleData,
+    host::HostInterface,
+};
 use core::panic::PanicInfo;
 use rpi_pico_sdk_sys::*;
 
@@ -14,24 +17,26 @@ mod cycling;
 const ONBOARD_LED_PIN: u32 = 25;
 const MAGNET_PIN: u32 = 2;
 
+const MODULES_STARTUP_MS: u32 = 350;
+
 
 #[no_mangle]
-pub extern "C" fn main() -> ! {
-    let conn = unsafe { host::Connection::new().unwrap() };
+pub unsafe extern "C" fn main() -> ! {
+    sleep_ms(MODULES_STARTUP_MS);
 
-    unsafe { init_magnet_sensor(); }
-    let mut last_cycle_time = unsafe { time_us_64() };
+    init_magnet_sensor();
+    let host = HostInterface::new().unwrap();
+
+    let mut last_cycle_time = time_us_64();
 
     loop {
-        unsafe {
-            // asm!("wfi");
-            // TODO: temporary until magnet sensor is figured out
-            sleep_ms(1000);
-            let delta = time_us_64() - last_cycle_time;
-            last_cycle_time = time_us_64();
-            let data = CycleData { micros: delta as u32 };
-            conn.push(&data).unwrap();
-        }
+        // asm!("wfi");
+        // TODO: temporary until magnet sensor is figured out
+        sleep_ms(1000);
+        let delta = time_us_64() - last_cycle_time;
+        last_cycle_time = time_us_64();
+        let data = CycleData { micros: delta as u32 };
+        host.push(&data).unwrap();
     }
 }
 
