@@ -25,14 +25,15 @@ pub unsafe extern "C" fn main() -> ! {
     sleep_ms(MODULES_STARTUP_MS);
 
     init_magnet_sensor();
-    let host = HostInterface::new().unwrap();
+    let mut host = HostInterface::new().unwrap();
+    host.start(host::OperatingMode::Online);
 
     let mut last_cycle_time = time_us_64();
 
     loop {
         // asm!("wfi");
         // TODO: temporary until magnet sensor is figured out
-        sleep_ms(1000);
+        sleep_ms(1);
         let delta = time_us_64() - last_cycle_time;
         last_cycle_time = time_us_64();
         let data = CycleData { micros: delta as u32 };

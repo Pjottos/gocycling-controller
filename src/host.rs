@@ -8,8 +8,30 @@ use crate::{
 
 static mut INSTANCE_CREATED: bool = false;
 
+#[derive(Clone, Copy)]
+pub enum OperatingMode {
+    Offline,
+    Online,
+}
+
+#[derive(Debug)]
+pub enum Error {
+    PostcardError(postcard::Error),
+    NotRunning,
+}
+
+impl From<postcard::Error> for Error {
+    fn from(val: postcard::Error) -> Self {
+        Self::PostcardError(val)
+    }
+}
+
 pub struct HostInterface {
     uart_dev: *mut c_void,
+    operating_mode: Option<OperatingMode>,
+    lost_connection_buf: [CycleData; Self::LOST_CONNECTION_BUF_SIZE],
+    lost_connection_item_count: usize,
+    connection_lost_time: Option<u64>,
 }
 
 impl HostInterface {
@@ -19,9 +41,11 @@ impl HostInterface {
 
     const STATE_PIN: u32 = 21;
 
-    /// Creates the interface to the host, returning None if one was already created
+    const LOST_CONNECTION_BUF_SIZE: usize = 64;
+
+    /// Creates the interface to the host, returning None if one is already active
     /// # Safety
-    /// This function is not thread safe as it uses non-atomic operations to check whether a device was already created.
+    /// This function is not thread safe as it uses non-atomic operations to check whether an interface is already active.
     pub unsafe fn new() -> Option<Self> {
         if INSTANCE_CREATED {
             return None;
@@ -41,23 +65,62 @@ impl HostInterface {
 
         Some(Self {
             uart_dev,
+            operating_mode: None,
+            lost_connection_buf: [CycleData::default(); Self::LOST_CONNECTION_BUF_SIZE],
+            lost_connection_item_count: 0,
+            connection_lost_time: None,
         })
     }
 
-    pub fn push(&self, data: &CycleData) -> Result<(), postcard::Error> {
+    pub fn push(&mut self, data: &CycleData) -> Result<(), Error> {
+        match self.operating_mode.ok_or(Error::NotRunning)? {
+            OperatingMode::Offline => todo!(),
+            OperatingMode::Online => unsafe {
+                // check if bluetooth is still connected
+                if gpio_get(Self::STATE_PIN) {
+                    // high if not connected
+
+                    if self.lost_connection_item_count < Self::LOST_CONNECTION_BUF_SIZE {
+                        self.lost_connection_buf[self.lost_connection_item_count] = *data;
+                        self.lost_connection_item_count += 1;
+                    }
+                    else {
+                        // TODO: stop the session, allow starting a new session later
+                        // todo!();
+                    }
+                }
+                else {
+                    // send any cycles that were generated while the connection was lost
+                    for item in &self.lost_connection_buf[0..self.lost_connection_item_count] {
+                        self.send_data(item)?;
+                    }
+                    self.lost_connection_item_count = 0;
+
+                    self.send_data(data)?;
+                }
+
+                Ok(())
+            } 
+        }
+    }
+
+    pub fn start(&mut self, mode: OperatingMode) {
+        self.operating_mode = Some(mode);
+    }
+
+    unsafe fn send_data(&self, data: &CycleData) -> Result<(), Error> {
         let mut buf = [0u8; 20];
         let (buf_crc, buf_data) = buf.split_at_mut(1);
         let used = postcard::to_slice(data, buf_data)?;
 
         buf_crc[0] = calc_crc8(used);
         let len = 1 + used.len();
-        unsafe { 
-            binding_uart_write_blocking(
-                self.uart_dev,
-                buf[0..len].as_ptr(),
-                len as u32,
-            );
-        }
+
+        binding_uart_write_blocking(
+            self.uart_dev,
+            buf[0..len].as_ptr(),
+            len as u32,
+        );
 
         Ok(())
     }
