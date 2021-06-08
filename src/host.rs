@@ -50,10 +50,10 @@ impl HostInterface {
         binding_uart_set_irq_enables(uart_dev, true, false);
 
         // set device name
-        execute_cmd(uart_dev, b"AT+NAME=GoCCCCycling");
+        execute_cmd(uart_dev, b"AT+NAME=GoCycling");
 
         // turn off onboard led
-        execute_cmd(uart_dev, b"AT+LED2M=1");
+        // execute_cmd(uart_dev, b"AT+LED2M=1");
 
         binding_gpio_set_dir(Self::PIN_CONNECTION_STATE, false);
 
