@@ -9,7 +9,9 @@ cd ..
 echo "#![allow(dead_code)]
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
-" > src/binding.rs
+
+pub mod impls;
+" > src/binding/mod.rs
 
 bindgen pico-binding/wrapper.hpp \
     --use-core \
@@ -35,6 +37,6 @@ bindgen pico-binding/wrapper.hpp \
     -I pico-sdk/src/rp2040/hardware_structs/include \
     -I pico-sdk/src/boards/include \
     -I pico-binding/generated \
-    >> src/binding.rs
+    >> src/binding/mod.rs
 
 cd build

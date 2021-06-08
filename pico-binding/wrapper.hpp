@@ -10,6 +10,8 @@ extern "C" void binding_uart_destroy(void* uart);
 extern "C" void binding_uart_write_blocking(void* uart, const uint8_t *data, uint len);
 extern "C" void binding_uart_read_blocking(void *uart, uint8_t *data, uint len);
 extern "C" void binding_uart_set_irq_enables(void *uart, bool rx, bool tx);
+extern "C" bool binding_uart_is_readable(void *uart);
+extern "C" uint8_t binding_uart_getc(void *uart);
 
 extern "C" void binding_irq_set_exclusive_handler(uint irq, void (*fn)());
 extern "C" void binding_irq_set_enabled(uint irq, bool enabled);

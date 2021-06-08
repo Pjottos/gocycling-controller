@@ -28,6 +28,14 @@ void binding_uart_set_irq_enables(void *uart, bool rx, bool tx) {
     uart_set_irq_enables((uart_inst_t *)uart, rx, tx);
 }
 
+bool binding_uart_is_readable(void *uart) {
+    return uart_is_readable((uart_inst_t *)uart);
+}
+
+uint8_t binding_uart_getc(void *uart) {
+    return uart_getc((uart_inst_t *)uart);
+}
+
 
 void binding_irq_set_exclusive_handler(uint irq, void (*fn)()) {
     irq_set_exclusive_handler(irq, fn);
@@ -36,6 +44,7 @@ void binding_irq_set_exclusive_handler(uint irq, void (*fn)()) {
 void binding_irq_set_enabled(uint irq, bool enabled) {
     irq_set_enabled(irq, enabled);
 }
+
 
 void binding_gpio_set_dir(uint gpio, bool out) {
     gpio_set_dir(gpio, out);

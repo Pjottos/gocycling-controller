@@ -24,12 +24,72 @@ impl From<postcard::Error> for Error {
     }
 }
 
+enum Command {
+    StartSession { timestamp: datetime_t },
+}
+
+impl Command {
+    const CMD_START_SESSION: u8 = 1;
+
+    fn expected_len(raw: u8) -> Option<usize> {
+        let data_size = match raw {
+            Self::CMD_START_SESSION => Some(5),
+            _ => None,
+        };
+
+        data_size.map(|size| 2 + size)
+    }
+
+    fn deserialize(raw: &[u8]) -> Option<Self> {
+        if raw.len() == 0 {
+            return None;
+        }
+
+        let data = Self::command_data(raw);
+
+        match raw[0] {
+            Self::CMD_START_SESSION => {
+                if data.len() != 7 || !Self::verify_crc8(raw) {
+                    None
+                } else {
+                    let bytes = [raw[2], raw[3], raw[4], raw[5], raw[6], 0, 0, 0];
+                    let timestamp = datetime_t::from_bits(u64::from_le_bytes(bytes));
+                    Some(Self::StartSession { timestamp })
+                }
+            },
+            _ => None,
+        }
+    }
+
+    fn verify_crc8(raw: &[u8]) -> bool {
+        if raw.len() < 2 {
+            return false;
+        }
+
+        let expected = raw[1];
+
+        expected == calc_crc8(Self::command_data(raw))
+    }
+
+    fn command_data<'a>(raw: &'a [u8]) -> &'a [u8] {
+        if raw.len() < 2 {
+            &raw[..0]
+        }
+        else {
+            &raw[2..]
+        }
+    }
+}
+
 pub struct HostInterface {
     uart_dev: *mut c_void,
     operating_mode: Option<OperatingMode>,
     lost_connection_buf: [CycleData; Self::LOST_CONNECTION_BUF_SIZE],
     lost_connection_item_count: usize,
     connection_lost_time: Option<u64>,
+    cmd_receive_buffer: [u8; Self::MAX_COMMAND_SIZE],
+    cur_cmd_len: usize,
+    expected_cmd_len: usize,
 }
 
 impl HostInterface {
@@ -41,6 +101,8 @@ impl HostInterface {
 
     const LOST_CONNECTION_BUF_SIZE: usize = 64;
 
+    const MAX_COMMAND_SIZE: usize = 64;
+
     pub unsafe fn create() {
         let uart_dev = binding_uart0_init(Self::BAUD_RATE, Self::TX_PIN, Self::RX_PIN);
 
@@ -50,10 +112,10 @@ impl HostInterface {
         binding_uart_set_irq_enables(uart_dev, true, false);
 
         // set device name
-        execute_cmd(uart_dev, b"AT+NAME=GoCycling");
+        execute_at_cmd(uart_dev, b"AT+NAME=GoCycling");
 
         // turn off onboard led
-        // execute_cmd(uart_dev, b"AT+LED2M=1");
+        // execute_at_cmd(uart_dev, b"AT+LED2M=1");
 
         binding_gpio_set_dir(Self::PIN_CONNECTION_STATE, false);
 
@@ -63,6 +125,9 @@ impl HostInterface {
             lost_connection_buf: [CycleData::default(); Self::LOST_CONNECTION_BUF_SIZE],
             lost_connection_item_count: 0,
             connection_lost_time: None,
+            cmd_receive_buffer: [0u8; Self::MAX_COMMAND_SIZE],
+            cur_cmd_len: 0,
+            expected_cmd_len: 0,
         });
     }
 
@@ -123,6 +188,14 @@ impl HostInterface {
 
         Ok(())
     }
+
+    fn execute_cmd(&mut self, cmd: Command) {
+        match cmd {
+            Command::StartSession { timestamp } => {
+                // TODO
+            },
+        }
+    }
 }
 
 impl Drop for HostInterface {
@@ -152,7 +225,8 @@ fn calc_crc8(data: &[u8]) -> u8 {
     crc
 }
 
-unsafe fn execute_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
+
+unsafe fn execute_at_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
     binding_uart_write_blocking(uart_dev, cmd.as_ptr(), cmd.len() as u32);
     // response for command AT+XXXX is always OK+XXXX so expect a response the same size
     // as the command sent
@@ -160,6 +234,32 @@ unsafe fn execute_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
     binding_uart_read_blocking(uart_dev, buf.as_mut_ptr(), buf.len() as u32);
 }
 
-extern "C" fn on_uart0_rx() {
+unsafe extern "C" fn on_uart0_rx() {
+    if let Some(interface) = HOST_INTERFACE.as_mut() {
+        while binding_uart_is_readable(interface.uart_dev) {
+            let char = binding_uart_getc(interface.uart_dev);
 
+            // start receiving new command, discarding the byte if it is not a valid command
+            if interface.cur_cmd_len == 0 {
+                if let Some(expected) = Command::expected_len(char) {
+                    interface.expected_cmd_len = expected;
+                }
+                else {
+                    continue;
+                }
+            }
+
+            // record the current command...
+            interface.cmd_receive_buffer[interface.cur_cmd_len] = char; 
+            interface.cur_cmd_len += 1;
+
+            // ... until we got the expected amount of bytes
+            if interface.cur_cmd_len == interface.expected_cmd_len {
+                // and try to deserialize it
+                if let Some(cmd) = Command::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len]) {
+                    interface.execute_cmd(cmd);
+                }
+            }
+        }
+    }
 }
