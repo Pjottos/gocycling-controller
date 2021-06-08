@@ -1,15 +1,15 @@
 use crate::binding::*;
 
 pub static mut BATTERY_LED: RgbLed = RgbLed {
-    r_pin: 10,
-    g_pin: 11,
-    b_pin: 12,
+    r_pin: 2,
+    g_pin: 3,
+    b_pin: 4,
 };
 
 pub static mut STATUS_LED: RgbLed = RgbLed {
-    r_pin: 13,
-    g_pin: 14,
-    b_pin: 15,
+    r_pin: 5,
+    g_pin: 6,
+    b_pin: 7,
 };
 
 pub struct RgbLed {
