@@ -4,7 +4,7 @@ use crate::{
     cycling::CycleData,
 };
 
-static mut INSTANCE_CREATED: bool = false;
+pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
 #[derive(Clone, Copy)]
 pub enum OperatingMode {
@@ -37,37 +37,33 @@ impl HostInterface {
     const TX_PIN: u32 = 0;
     const RX_PIN: u32 = 1;
 
-    const STATE_PIN: u32 = 21;
+    pub const PIN_CONNECTION_STATE: u32 = 21;
 
     const LOST_CONNECTION_BUF_SIZE: usize = 64;
 
-    /// Creates the interface to the host, returning None if one is already active
-    /// # Safety
-    /// This function is not thread safe as it uses non-atomic operations to check whether an interface is already active.
-    pub unsafe fn new() -> Option<Self> {
-        if INSTANCE_CREATED {
-            return None;
-        }
-
+    pub unsafe fn create() {
         let uart_dev = binding_uart0_init(Self::BAUD_RATE, Self::TX_PIN, Self::RX_PIN);
 
-        INSTANCE_CREATED = true;
+        binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
+        binding_irq_set_enabled(UART0_IRQ, true);
+
+        binding_uart_set_irq_enables(uart_dev, true, false);
 
         // set device name
-        execute_cmd(uart_dev, b"AT+NAME=GoCycling");
+        execute_cmd(uart_dev, b"AT+NAME=GoCCCCycling");
 
         // turn off onboard led
         execute_cmd(uart_dev, b"AT+LED2M=1");
 
-        binding_gpio_set_dir(Self::STATE_PIN, false);
+        binding_gpio_set_dir(Self::PIN_CONNECTION_STATE, false);
 
-        Some(Self {
+        HOST_INTERFACE = Some(Self {
             uart_dev,
             operating_mode: None,
             lost_connection_buf: [CycleData::default(); Self::LOST_CONNECTION_BUF_SIZE],
             lost_connection_item_count: 0,
             connection_lost_time: None,
-        })
+        });
     }
 
     pub fn push(&mut self, data: &CycleData) -> Result<(), Error> {
@@ -75,7 +71,8 @@ impl HostInterface {
             OperatingMode::Offline => todo!(),
             OperatingMode::Online => unsafe {
                 // check if bluetooth is still connected
-                if binding_gpio_get(Self::STATE_PIN) {
+                // TODO: handle with interrupt
+                if binding_gpio_get(Self::PIN_CONNECTION_STATE) {
                     // high if not connected
 
                     if self.lost_connection_item_count < Self::LOST_CONNECTION_BUF_SIZE {
@@ -106,6 +103,10 @@ impl HostInterface {
         self.operating_mode = Some(mode);
     }
 
+    pub fn connection_changed(&mut self, connected: bool) {
+
+    }
+
     unsafe fn send_data(&self, data: &CycleData) -> Result<(), Error> {
         let mut buf = [0u8; 20];
         let (buf_crc, buf_data) = buf.split_at_mut(1);
@@ -128,7 +129,6 @@ impl Drop for HostInterface {
     fn drop(&mut self) {
         unsafe { 
             binding_uart_destroy(self.uart_dev);
-            INSTANCE_CREATED = false;
         }
     }
 }
@@ -158,4 +158,8 @@ unsafe fn execute_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
     // as the command sent
     let mut buf = [0u8; S];
     binding_uart_read_blocking(uart_dev, buf.as_mut_ptr(), buf.len() as u32);
+}
+
+extern "C" fn on_uart0_rx() {
+
 }

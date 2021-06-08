@@ -2229,8 +2229,8 @@ extern "C" {
 extern "C" {
     pub fn binding_uart0_init(
         baud_rate: uint,
-        tx_pin: u32,
-        rx_pin: u32,
+        tx_pin: uint,
+        rx_pin: uint,
     ) -> *mut crate::ctypes::c_void;
 }
 extern "C" {

@@ -5,3 +5,7 @@ use serde::Serialize;
 pub struct CycleData {
     pub micros: u32,
 }
+
+pub fn handle_cycle() {
+
+}

@@ -1,5 +1,17 @@
 use crate::binding::*;
 
+pub static mut BATTERY_LED: RgbLed = RgbLed {
+    r_pin: 10,
+    g_pin: 11,
+    b_pin: 12,
+};
+
+pub static mut STATUS_LED: RgbLed = RgbLed {
+    r_pin: 13,
+    g_pin: 14,
+    b_pin: 15,
+};
+
 pub struct RgbLed {
     r_pin: u32,
     g_pin: u32,
@@ -7,19 +19,14 @@ pub struct RgbLed {
 }
 
 impl RgbLed {
-    pub unsafe fn new(r_pin: u32, g_pin: u32, b_pin: u32) -> Self {
-        binding_gpio_set_dir(r_pin, true);
-        gpio_set_function(r_pin, GPIO_FUNC_PWM);
-        binding_gpio_set_dir(g_pin, true);
-        gpio_set_function(g_pin, GPIO_FUNC_PWM);
-        binding_gpio_set_dir(b_pin, true);
-        gpio_set_function(b_pin, GPIO_FUNC_PWM);
+    pub unsafe fn init(led: &RgbLed) {
+        binding_gpio_set_dir(led.r_pin, true);
+        binding_gpio_set_dir(led.g_pin, true);
+        binding_gpio_set_dir(led.b_pin, true);
 
-        Self {
-            r_pin,
-            g_pin,
-            b_pin,
-        }
+        gpio_set_function(led.r_pin, GPIO_FUNC_PWM);
+        gpio_set_function(led.g_pin, GPIO_FUNC_PWM);
+        gpio_set_function(led.b_pin, GPIO_FUNC_PWM);
     }
 
     /// All values are normalized, 
