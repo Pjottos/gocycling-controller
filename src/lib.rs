@@ -2,12 +2,12 @@
 #![feature(asm)]
 
 use crate::{
+    binding::*,
     cycling::CycleData,
     host::HostInterface,
 };
 use core::panic::PanicInfo;
 use rgb::RgbLed;
-use rpi_pico_sdk_sys::*;
 
 mod binding;
 mod ctypes;
@@ -15,6 +15,7 @@ mod ctypes;
 mod host;
 mod cycling;
 mod rgb;
+mod interrupt;
 
 const PIN_ONBOARD_LED: u32 = 25;
 
@@ -71,7 +72,7 @@ pub unsafe extern "C" fn main() -> ! {
 fn handle_panic(_info: &PanicInfo) -> ! {
     unsafe {
         gpio_set_function(PIN_ONBOARD_LED, GPIO_OUT);
-        gpio_put(PIN_ONBOARD_LED, true);
+        binding_gpio_put(PIN_ONBOARD_LED, true);
 
         loop {
             sleep_ms(1);
@@ -80,17 +81,10 @@ fn handle_panic(_info: &PanicInfo) -> ! {
 }
 
 unsafe fn init_pins() {
-    gpio_set_dir(PIN_MAGNET, GPIO_IN);
-    gpio_pull_up(PIN_MAGNET);
+    binding_gpio_set_dir(PIN_MAGNET, false);
+    gpio_set_pulls(PIN_MAGNET, true, false);
 
     // TODO: set up adc for battery level
-
-    // pin number has no effect
-    gpio_set_irq_enabled(
-        0,
-        gpio_irq_level_GPIO_IRQ_EDGE_FALL,
-        true,
-    );
 }
 
 unsafe fn wait_for_mode_select(status_led: &RgbLed) -> host::OperatingMode {

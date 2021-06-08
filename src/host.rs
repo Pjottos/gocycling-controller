@@ -1,5 +1,3 @@
-use rpi_pico_sdk_sys::*;
-
 use crate::{
     binding::*,
     ctypes::c_void,
@@ -61,7 +59,7 @@ impl HostInterface {
         // turn off onboard led
         execute_cmd(uart_dev, b"AT+LED2M=1");
 
-        gpio_set_dir(Self::STATE_PIN, GPIO_IN);
+        binding_gpio_set_dir(Self::STATE_PIN, false);
 
         Some(Self {
             uart_dev,
@@ -77,7 +75,7 @@ impl HostInterface {
             OperatingMode::Offline => todo!(),
             OperatingMode::Online => unsafe {
                 // check if bluetooth is still connected
-                if gpio_get(Self::STATE_PIN) {
+                if binding_gpio_get(Self::STATE_PIN) {
                     // high if not connected
 
                     if self.lost_connection_item_count < Self::LOST_CONNECTION_BUF_SIZE {

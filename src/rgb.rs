@@ -1,8 +1,5 @@
 use crate::binding::*;
 
-use rpi_pico_sdk_sys::*;
-
-
 pub struct RgbLed {
     r_pin: u32,
     g_pin: u32,
@@ -11,12 +8,12 @@ pub struct RgbLed {
 
 impl RgbLed {
     pub unsafe fn new(r_pin: u32, g_pin: u32, b_pin: u32) -> Self {
-        gpio_set_dir(r_pin, GPIO_OUT);
-        gpio_set_function(r_pin, gpio_function_GPIO_FUNC_PWM);
-        gpio_set_dir(g_pin, GPIO_OUT);
-        gpio_set_function(g_pin, gpio_function_GPIO_FUNC_PWM);
-        gpio_set_dir(b_pin, GPIO_OUT);
-        gpio_set_function(b_pin, gpio_function_GPIO_FUNC_PWM);
+        binding_gpio_set_dir(r_pin, true);
+        gpio_set_function(r_pin, GPIO_FUNC_PWM);
+        binding_gpio_set_dir(g_pin, true);
+        gpio_set_function(g_pin, GPIO_FUNC_PWM);
+        binding_gpio_set_dir(b_pin, true);
+        gpio_set_function(b_pin, GPIO_FUNC_PWM);
 
         Self {
             r_pin,
