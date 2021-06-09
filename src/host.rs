@@ -9,7 +9,10 @@ pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 #[derive(Clone, Copy)]
 pub enum OperatingMode {
     Offline,
-    Online,
+    Online {
+        started: bool,
+        connected: bool,
+    },
 }
 
 #[derive(Debug)]
@@ -25,7 +28,7 @@ impl From<postcard::Error> for Error {
 }
 
 enum Command {
-    StartSession { timestamp: datetime_t },
+    StartSession { datetime: datetime_t },
 }
 
 impl Command {
@@ -53,8 +56,8 @@ impl Command {
                     None
                 } else {
                     let bytes = [raw[2], raw[3], raw[4], raw[5], raw[6], 0, 0, 0];
-                    let timestamp = datetime_t::from_bits(u64::from_le_bytes(bytes));
-                    Some(Self::StartSession { timestamp })
+                    let datetime = datetime_t::from_bits(u64::from_le_bytes(bytes));
+                    Some(Self::StartSession { datetime })
                 }
             },
             _ => None,
@@ -134,22 +137,10 @@ impl HostInterface {
     pub fn push(&mut self, data: &CycleData) -> Result<(), Error> {
         match self.operating_mode.ok_or(Error::NotRunning)? {
             OperatingMode::Offline => todo!(),
-            OperatingMode::Online => unsafe {
-                // check if bluetooth is still connected
-                // TODO: handle with interrupt
-                if binding_gpio_get(Self::PIN_CONNECTION_STATE) {
-                    // high if not connected
-
-                    if self.lost_connection_item_count < Self::LOST_CONNECTION_BUF_SIZE {
-                        self.lost_connection_buf[self.lost_connection_item_count] = *data;
-                        self.lost_connection_item_count += 1;
-                    }
-                    else {
-                        // TODO: stop the session, allow starting a new session later
-                        // todo!();
-                    }
-                }
-                else {
+            // TODO: should we return an error here?
+            OperatingMode::Online { started: false, .. } => Ok(()),
+            OperatingMode::Online { started: true, connected } => unsafe {
+                if connected {
                     // send any cycles that were generated while the connection was lost
                     for item in &self.lost_connection_buf[0..self.lost_connection_item_count] {
                         self.send_data(item)?;
@@ -158,9 +149,20 @@ impl HostInterface {
 
                     self.send_data(data)?;
                 }
+                else {
+                    // record cycle data in a temporary buffer when the connection is temporarly lost
+                    if self.lost_connection_item_count < Self::LOST_CONNECTION_BUF_SIZE {
+                        self.lost_connection_buf[self.lost_connection_item_count] = *data;
+                        self.lost_connection_item_count += 1;
+                    }
+                    else {
+                        // TODO: switch to offline mode?
+                        self.operating_mode = None;
+                    }
+                }
 
                 Ok(())
-            } 
+            }
         }
     }
 
@@ -168,8 +170,10 @@ impl HostInterface {
         self.operating_mode = Some(mode);
     }
 
-    pub fn connection_changed(&mut self, connected: bool) {
-
+    pub fn connection_changed(&mut self, value: bool) {
+        if let Some(OperatingMode::Online { connected, .. }) = self.operating_mode.as_mut() {
+            *connected = value;
+        }
     }
 
     unsafe fn send_data(&self, data: &CycleData) -> Result<(), Error> {
@@ -191,9 +195,16 @@ impl HostInterface {
 
     fn execute_cmd(&mut self, cmd: Command) {
         match cmd {
-            Command::StartSession { timestamp } => {
-                // TODO
-            },
+            Command::StartSession { mut datetime } => self.cmd_start_session(&mut datetime),
+        }
+    }
+
+    fn cmd_start_session(&mut self, datetime: &mut datetime_t) {
+        if let Some(OperatingMode::Online { started, .. }) = self.operating_mode.as_mut() {
+            unsafe {
+                rtc_set_datetime(datetime);
+                *started = true;
+            }
         }
     }
 }
@@ -226,6 +237,8 @@ fn calc_crc8(data: &[u8]) -> u8 {
 }
 
 
+/// Must be called only before the global HOST_INTERFACE is set, otherwise the 
+/// UART interrupt will interfere
 unsafe fn execute_at_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
     binding_uart_write_blocking(uart_dev, cmd.as_ptr(), cmd.len() as u32);
     // response for command AT+XXXX is always OK+XXXX so expect a response the same size

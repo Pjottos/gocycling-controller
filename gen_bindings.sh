@@ -33,6 +33,7 @@ bindgen pico-binding/wrapper.hpp \
     -I pico-sdk/src/rp2_common/hardware_irq/include \
     -I pico-sdk/src/rp2_common/hardware_pwm/include \
     -I pico-sdk/src/rp2_common/hardware_spi/include \
+    -I pico-sdk/src/rp2_common/hardware_rtc/include \
     -I pico-sdk/src/rp2040/hardware_regs/include \
     -I pico-sdk/src/rp2040/hardware_structs/include \
     -I pico-sdk/src/boards/include \

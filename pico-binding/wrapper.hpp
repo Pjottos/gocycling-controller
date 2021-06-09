@@ -4,6 +4,7 @@
 #include "hardware/irq.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
+#include "hardware/rtc.h"
 
 extern "C" void *binding_uart0_init(uint baud_rate, uint tx_pin, uint rx_pin);
 extern "C" void binding_uart_destroy(void* uart);

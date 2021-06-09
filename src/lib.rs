@@ -22,11 +22,15 @@ const MODULES_STARTUP_MS: u32 = 350;
 
 #[no_mangle]
 pub unsafe extern "C" fn main() -> ! {
-    sleep_ms(MODULES_STARTUP_MS);
-
     RgbLed::init(&rgb::STATUS_LED);
     RgbLed::init(&rgb::BATTERY_LED);
+
+    sleep_ms(MODULES_STARTUP_MS);
+
+    rtc_init();
+
     HostInterface::create();
+
     interrupt::init();
 
     let host = host::HOST_INTERFACE.as_mut().unwrap();
@@ -62,7 +66,10 @@ fn handle_panic(_info: &PanicInfo) -> ! {
 
 unsafe fn wait_for_mode_select() -> host::OperatingMode {
     // TODO
-    return host::OperatingMode::Online;
+    return host::OperatingMode::Online {
+        started: false,
+        connected: false,
+    };
 
     const TICK_US: u64 = 500;
     const H_PER_TICK: u8 = 1;

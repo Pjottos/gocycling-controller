@@ -1075,6 +1075,54 @@ pub const PICO_LOWEST_IRQ_PRIORITY: u32 = 1;
 pub const PICO_HIGHEST_IRQ_PRIORITY: u32 = 255;
 pub const PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY: u32 = 128;
 pub const PARAM_ASSERTIONS_ENABLED_IRQ: u32 = 0;
+pub const RTC_CLKDIV_M1_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_SETUP_0_YEAR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_SETUP_0_MONTH_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_SETUP_0_DAY_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_SETUP_1_DOTW_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_SETUP_1_HOUR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_SETUP_1_MIN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_SETUP_1_SEC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_CTRL_FORCE_NOTLEAPYEAR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_CTRL_LOAD_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const RTC_CTRL_RTC_ACTIVE_RESET: &'static [u8; 2usize] = b"-\0";
+pub const RTC_CTRL_RTC_ACTIVE_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const RTC_CTRL_RTC_ENABLE_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_0_MATCH_ACTIVE_RESET: &'static [u8; 2usize] = b"-\0";
+pub const RTC_IRQ_SETUP_0_MATCH_ACTIVE_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const RTC_IRQ_SETUP_0_MATCH_ENA_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_0_YEAR_ENA_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_0_MONTH_ENA_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_0_DAY_ENA_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_0_YEAR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_0_MONTH_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_0_DAY_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_1_DOTW_ENA_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_1_HOUR_ENA_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_1_MIN_ENA_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_1_SEC_ENA_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_1_DOTW_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_1_HOUR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_1_MIN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_IRQ_SETUP_1_SEC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_RTC_1_YEAR_RESET: &'static [u8; 2usize] = b"-\0";
+pub const RTC_RTC_1_YEAR_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const RTC_RTC_1_MONTH_RESET: &'static [u8; 2usize] = b"-\0";
+pub const RTC_RTC_1_MONTH_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const RTC_RTC_1_DAY_RESET: &'static [u8; 2usize] = b"-\0";
+pub const RTC_RTC_1_DAY_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const RTC_RTC_0_DOTW_RESET: &'static [u8; 2usize] = b"-\0";
+pub const RTC_RTC_0_DOTW_ACCESS: &'static [u8; 3usize] = b"RF\0";
+pub const RTC_RTC_0_HOUR_RESET: &'static [u8; 2usize] = b"-\0";
+pub const RTC_RTC_0_HOUR_ACCESS: &'static [u8; 3usize] = b"RF\0";
+pub const RTC_RTC_0_MIN_RESET: &'static [u8; 2usize] = b"-\0";
+pub const RTC_RTC_0_MIN_ACCESS: &'static [u8; 3usize] = b"RF\0";
+pub const RTC_RTC_0_SEC_RESET: &'static [u8; 2usize] = b"-\0";
+pub const RTC_RTC_0_SEC_ACCESS: &'static [u8; 3usize] = b"RF\0";
+pub const RTC_INTR_RTC_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const RTC_INTE_RTC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_INTF_RTC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const RTC_INTS_RTC_ACCESS: &'static [u8; 3usize] = b"RO\0";
 pub type std_size_t = crate::ctypes::c_ulong;
 pub type std_nullptr_t = *const crate::ctypes::c_void;
 extern "C" {
@@ -2227,6 +2275,72 @@ extern "C" {
     #[doc = ""]
     #[doc = " \\note This is an internal method and user should generally not call it."]
     pub fn irq_init_priorities();
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct rtc_hw_t {
+    pub clkdiv_m1: io_rw_32,
+    pub setup_0: io_rw_32,
+    pub setup_1: io_rw_32,
+    pub ctrl: io_rw_32,
+    pub irq_setup_0: io_rw_32,
+    pub irq_setup_1: io_rw_32,
+    pub rtc_1: io_rw_32,
+    pub rtc_0: io_rw_32,
+    pub intr: io_rw_32,
+    pub inte: io_rw_32,
+    pub intf: io_rw_32,
+    pub ints: io_rw_32,
+}
+#[doc = " Callback function type for RTC alarms"]
+#[doc = "  \\ingroup hardware_rtc"]
+#[doc = ""]
+#[doc = " \\sa rtc_set_alarm()"]
+pub type rtc_callback_t = ::core::option::Option<unsafe extern "C" fn()>;
+extern "C" {
+    #[doc = " \\brief Initialise the RTC system"]
+    #[doc = "  \\ingroup hardware_rtc"]
+    pub fn rtc_init();
+}
+extern "C" {
+    #[doc = " \\brief Set the RTC to the specified time"]
+    #[doc = "  \\ingroup hardware_rtc"]
+    #[doc = ""]
+    #[doc = " \\param t Pointer to a \\ref datetime_t structure contains time to set"]
+    #[doc = " \\return true if set, false if the passed in datetime was invalid."]
+    pub fn rtc_set_datetime(t: *mut datetime_t) -> bool;
+}
+extern "C" {
+    #[doc = " \\brief Get the current time from the RTC"]
+    #[doc = "  \\ingroup hardware_rtc"]
+    #[doc = ""]
+    #[doc = " \\param t Pointer to a \\ref datetime_t structure to receive the current RTC time"]
+    #[doc = " \\return true if datetime is valid, false if the RTC is not running."]
+    pub fn rtc_get_datetime(t: *mut datetime_t) -> bool;
+}
+extern "C" {
+    #[doc = " \\brief Is the RTC running?"]
+    #[doc = "  \\ingroup hardware_rtc"]
+    #[doc = ""]
+    pub fn rtc_running() -> bool;
+}
+extern "C" {
+    #[doc = " \\brief Set a time in the future for the RTC to call a user provided callback"]
+    #[doc = "  \\ingroup hardware_rtc"]
+    #[doc = ""]
+    #[doc = "  \\param t Pointer to a \\ref datetime_t structure containing a time in the future to fire the alarm. Any values set to -1 will not be matched on."]
+    #[doc = "  \\param user_callback pointer to a \\ref rtc_callback_t to call when the alarm fires"]
+    pub fn rtc_set_alarm(t: *mut datetime_t, user_callback: rtc_callback_t);
+}
+extern "C" {
+    #[doc = " \\brief Enable the RTC alarm (if inactive)"]
+    #[doc = "  \\ingroup hardware_rtc"]
+    pub fn rtc_enable_alarm();
+}
+extern "C" {
+    #[doc = " \\brief Disable the RTC alarm (if active)"]
+    #[doc = "  \\ingroup hardware_rtc"]
+    pub fn rtc_disable_alarm();
 }
 extern "C" {
     pub fn binding_uart0_init(
