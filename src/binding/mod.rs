@@ -1123,6 +1123,151 @@ pub const RTC_INTR_RTC_ACCESS: &'static [u8; 3usize] = b"RO\0";
 pub const RTC_INTE_RTC_ACCESS: &'static [u8; 3usize] = b"RW\0";
 pub const RTC_INTF_RTC_ACCESS: &'static [u8; 3usize] = b"RW\0";
 pub const RTC_INTS_RTC_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const PWM_CH0_CSR_PH_ADV_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH0_CSR_PH_RET_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH0_CSR_DIVMODE_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_CSR_B_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_CSR_A_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_CSR_PH_CORRECT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_CSR_EN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_DIV_INT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_DIV_FRAC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_CTR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_CC_B_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_CC_A_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH0_TOP_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_CSR_PH_ADV_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH1_CSR_PH_RET_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH1_CSR_DIVMODE_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_CSR_B_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_CSR_A_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_CSR_PH_CORRECT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_CSR_EN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_DIV_INT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_DIV_FRAC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_CTR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_CC_B_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_CC_A_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH1_TOP_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_CSR_PH_ADV_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH2_CSR_PH_RET_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH2_CSR_DIVMODE_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_CSR_B_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_CSR_A_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_CSR_PH_CORRECT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_CSR_EN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_DIV_INT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_DIV_FRAC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_CTR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_CC_B_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_CC_A_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH2_TOP_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_CSR_PH_ADV_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH3_CSR_PH_RET_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH3_CSR_DIVMODE_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_CSR_B_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_CSR_A_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_CSR_PH_CORRECT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_CSR_EN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_DIV_INT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_DIV_FRAC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_CTR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_CC_B_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_CC_A_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH3_TOP_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_CSR_PH_ADV_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH4_CSR_PH_RET_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH4_CSR_DIVMODE_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_CSR_B_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_CSR_A_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_CSR_PH_CORRECT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_CSR_EN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_DIV_INT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_DIV_FRAC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_CTR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_CC_B_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_CC_A_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH4_TOP_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_CSR_PH_ADV_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH5_CSR_PH_RET_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH5_CSR_DIVMODE_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_CSR_B_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_CSR_A_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_CSR_PH_CORRECT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_CSR_EN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_DIV_INT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_DIV_FRAC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_CTR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_CC_B_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_CC_A_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH5_TOP_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_CSR_PH_ADV_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH6_CSR_PH_RET_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH6_CSR_DIVMODE_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_CSR_B_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_CSR_A_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_CSR_PH_CORRECT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_CSR_EN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_DIV_INT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_DIV_FRAC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_CTR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_CC_B_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_CC_A_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH6_TOP_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_CSR_PH_ADV_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH7_CSR_PH_RET_ACCESS: &'static [u8; 3usize] = b"SC\0";
+pub const PWM_CH7_CSR_DIVMODE_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_CSR_B_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_CSR_A_INV_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_CSR_PH_CORRECT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_CSR_EN_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_DIV_INT_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_DIV_FRAC_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_CTR_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_CC_B_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_CC_A_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_CH7_TOP_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_EN_CH7_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_EN_CH6_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_EN_CH5_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_EN_CH4_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_EN_CH3_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_EN_CH2_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_EN_CH1_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_EN_CH0_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTR_CH7_ACCESS: &'static [u8; 3usize] = b"WC\0";
+pub const PWM_INTR_CH6_ACCESS: &'static [u8; 3usize] = b"WC\0";
+pub const PWM_INTR_CH5_ACCESS: &'static [u8; 3usize] = b"WC\0";
+pub const PWM_INTR_CH4_ACCESS: &'static [u8; 3usize] = b"WC\0";
+pub const PWM_INTR_CH3_ACCESS: &'static [u8; 3usize] = b"WC\0";
+pub const PWM_INTR_CH2_ACCESS: &'static [u8; 3usize] = b"WC\0";
+pub const PWM_INTR_CH1_ACCESS: &'static [u8; 3usize] = b"WC\0";
+pub const PWM_INTR_CH0_ACCESS: &'static [u8; 3usize] = b"WC\0";
+pub const PWM_INTE_CH7_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTE_CH6_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTE_CH5_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTE_CH4_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTE_CH3_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTE_CH2_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTE_CH1_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTE_CH0_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTF_CH7_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTF_CH6_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTF_CH5_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTF_CH4_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTF_CH3_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTF_CH2_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTF_CH1_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTF_CH0_ACCESS: &'static [u8; 3usize] = b"RW\0";
+pub const PWM_INTS_CH7_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const PWM_INTS_CH6_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const PWM_INTS_CH5_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const PWM_INTS_CH4_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const PWM_INTS_CH3_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const PWM_INTS_CH2_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const PWM_INTS_CH1_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const PWM_INTS_CH0_ACCESS: &'static [u8; 3usize] = b"RO\0";
+pub const PARAM_ASSERTIONS_ENABLED_PWM: u32 = 0;
 pub type std_size_t = crate::ctypes::c_ulong;
 pub type std_nullptr_t = *const crate::ctypes::c_void;
 extern "C" {
@@ -2342,6 +2487,48 @@ extern "C" {
     #[doc = "  \\ingroup hardware_rtc"]
     pub fn rtc_disable_alarm();
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct pwm_slice_hw {
+    pub csr: io_rw_32,
+    pub div: io_rw_32,
+    pub ctr: io_rw_32,
+    pub cc: io_rw_32,
+    pub top: io_rw_32,
+}
+pub type pwm_slice_hw_t = pwm_slice_hw;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct pwm_hw_t {
+    pub slice: [pwm_slice_hw_t; 8usize],
+    pub en: io_rw_32,
+    pub intr: io_rw_32,
+    pub inte: io_rw_32,
+    pub intf: io_rw_32,
+    pub ints: io_rw_32,
+}
+#[doc = "< Free-running counting at rate dictated by fractional divider"]
+pub const PWM_DIV_FREE_RUNNING: pwm_clkdiv_mode = 0;
+#[doc = "< Fractional divider is gated by the PWM B pin"]
+pub const PWM_DIV_B_HIGH: pwm_clkdiv_mode = 1;
+#[doc = "< Fractional divider advances with each rising edge of the PWM B pin"]
+pub const PWM_DIV_B_RISING: pwm_clkdiv_mode = 2;
+#[doc = "< Fractional divider advances with each falling edge of the PWM B pin"]
+pub const PWM_DIV_B_FALLING: pwm_clkdiv_mode = 3;
+#[doc = " \\brief PWM Divider mode settings"]
+#[doc = "   \\ingroup hardware_pwm"]
+#[doc = ""]
+pub type pwm_clkdiv_mode = crate::ctypes::c_uint;
+pub const PWM_CHAN_A: pwm_chan = 0;
+pub const PWM_CHAN_B: pwm_chan = 1;
+pub type pwm_chan = crate::ctypes::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct pwm_config {
+    pub csr: u32,
+    pub div: u32,
+    pub top: u32,
+}
 extern "C" {
     pub fn binding_uart0_init(
         baud_rate: uint,
@@ -2388,4 +2575,16 @@ extern "C" {
 }
 extern "C" {
     pub fn binding_gpio_get(gpio: uint) -> bool;
+}
+extern "C" {
+    pub fn binding_pwm_gpio_to_slice_num(gpio: uint) -> uint;
+}
+extern "C" {
+    pub fn binding_pwm_get_default_config() -> pwm_config;
+}
+extern "C" {
+    pub fn binding_pwm_init(slice_num: uint, config: *mut pwm_config, running: bool);
+}
+extern "C" {
+    pub fn binding_pwm_set_gpio_level(gpio: uint, level: u16);
 }

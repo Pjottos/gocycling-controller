@@ -4,4 +4,6 @@ add_library(pico_binding
 
 target_link_libraries(pico_binding
     pico_stdlib
+    hardware_rtc
+    hardware_pwm
 )

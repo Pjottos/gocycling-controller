@@ -22,19 +22,19 @@ const MODULES_STARTUP_MS: u32 = 350;
 
 #[no_mangle]
 pub unsafe extern "C" fn main() -> ! {
-    RgbLed::init(&rgb::STATUS_LED);
-    RgbLed::init(&rgb::BATTERY_LED);
+    rgb::STATUS_LED.init();
+    rgb::BATTERY_LED.init();
 
     sleep_ms(MODULES_STARTUP_MS);
 
-    rtc_init();
-
     HostInterface::create();
 
+    let mode = wait_for_mode_select();
+
+    rtc_init();
     interrupt::init();
 
     let host = host::HOST_INTERFACE.as_mut().unwrap();
-    let mode = wait_for_mode_select();
     host.start(mode);
 
     let mut last_cycle_time = time_us_64();
@@ -66,19 +66,19 @@ fn handle_panic(_info: &PanicInfo) -> ! {
 
 unsafe fn wait_for_mode_select() -> host::OperatingMode {
     // TODO
-    return host::OperatingMode::Online {
-        started: false,
-        connected: false,
-    };
+    // return host::OperatingMode::Online {
+    //     started: false,
+    //     connected: false,
+    // };
 
-    const TICK_US: u64 = 500;
+    const TICK_MS: u32 = 3;
     const H_PER_TICK: u8 = 1;
 
-    let mut h = 0;
+    let mut hue = 0;
     loop {
-        rgb::STATUS_LED.put_hsv(h, u8::MAX, u8::MAX);
+        rgb::STATUS_LED.put_rainbow_hue(hue);
 
-        h = h.overflowing_add(H_PER_TICK).0;
-        sleep_us(TICK_US);
+        hue = hue.overflowing_add(H_PER_TICK).0;
+        sleep_ms(TICK_MS);
     }
 }

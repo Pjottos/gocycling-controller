@@ -109,11 +109,6 @@ impl HostInterface {
     pub unsafe fn create() {
         let uart_dev = binding_uart0_init(Self::BAUD_RATE, Self::TX_PIN, Self::RX_PIN);
 
-        binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
-        binding_irq_set_enabled(UART0_IRQ, true);
-
-        binding_uart_set_irq_enables(uart_dev, true, false);
-
         // set device name
         execute_at_cmd(uart_dev, b"AT+NAME=GoCycling");
 
@@ -166,8 +161,13 @@ impl HostInterface {
         }
     }
 
-    pub fn start(&mut self, mode: OperatingMode) {
+    pub unsafe fn start(&mut self, mode: OperatingMode) {
         self.operating_mode = Some(mode);
+
+        binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
+        binding_irq_set_enabled(UART0_IRQ, true);
+
+        binding_uart_set_irq_enables(self.uart_dev, true, false);
     }
 
     pub fn connection_changed(&mut self, value: bool) {
@@ -237,7 +237,7 @@ fn calc_crc8(data: &[u8]) -> u8 {
 }
 
 
-/// Must be called only before the global HOST_INTERFACE is set, otherwise the 
+/// Must be called only before the global HOST_INTERFACE is started, otherwise the 
 /// UART interrupt will interfere
 unsafe fn execute_at_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
     binding_uart_write_blocking(uart_dev, cmd.as_ptr(), cmd.len() as u32);

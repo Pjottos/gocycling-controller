@@ -5,6 +5,7 @@
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
 #include "hardware/rtc.h"
+#include "hardware/pwm.h"
 
 extern "C" void *binding_uart0_init(uint baud_rate, uint tx_pin, uint rx_pin);
 extern "C" void binding_uart_destroy(void* uart);
@@ -20,3 +21,8 @@ extern "C" void binding_irq_set_enabled(uint irq, bool enabled);
 extern "C" void binding_gpio_set_dir(uint gpio, bool out);
 extern "C" void binding_gpio_put(uint gpio, bool value);
 extern "C" bool binding_gpio_get(uint gpio);
+
+extern "C" uint binding_pwm_gpio_to_slice_num(uint gpio);
+extern "C" pwm_config binding_pwm_get_default_config();
+extern "C" void binding_pwm_init(uint slice_num, pwm_config *config, bool running);
+extern "C" void binding_pwm_set_gpio_level(uint gpio, uint16_t level);

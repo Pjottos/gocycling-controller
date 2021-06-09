@@ -57,3 +57,20 @@ void binding_gpio_put(uint gpio, bool value) {
 bool binding_gpio_get(uint gpio) {
     return gpio_get(gpio);
 }
+
+
+uint binding_pwm_gpio_to_slice_num(uint gpio) {
+    return pwm_gpio_to_slice_num(gpio);
+}
+
+pwm_config binding_pwm_get_default_config() {
+    return pwm_get_default_config();
+}
+
+void binding_pwm_init(uint slice_num, pwm_config *config, bool running) {
+    pwm_init(slice_num, config, running);
+}
+
+void binding_pwm_set_gpio_level(uint gpio, uint16_t level) {
+    pwm_set_gpio_level(gpio, level);
+}
