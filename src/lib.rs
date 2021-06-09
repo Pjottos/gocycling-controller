@@ -28,25 +28,16 @@ pub unsafe extern "C" fn main() -> ! {
     sleep_ms(MODULES_STARTUP_MS);
 
     HostInterface::create();
+    interrupt::init();
+    rtc_init();
 
     let mode = wait_for_mode_select();
-
-    rtc_init();
-    interrupt::init();
 
     let host = host::HOST_INTERFACE.as_mut().unwrap();
     host.start(mode);
 
-    let mut last_cycle_time = time_us_64();
-
     loop {
-        // asm!("wfi");
-        // TODO: temporary until magnet sensor is figured out
-        sleep_ms(1000);
-        let delta = time_us_64() - last_cycle_time;
-        last_cycle_time = time_us_64();
-        let data = CycleData { micros: delta as u32 };
-        host.push(&data).unwrap();
+        sleep_ms(1);
     }
 }
 
@@ -66,10 +57,10 @@ fn handle_panic(_info: &PanicInfo) -> ! {
 
 unsafe fn wait_for_mode_select() -> host::OperatingMode {
     // TODO
-    // return host::OperatingMode::Online {
-    //     started: false,
-    //     connected: false,
-    // };
+    return host::OperatingMode::Online {
+        started: true,
+        connected: true,
+    };
 
     const TICK_MS: u32 = 3;
     const H_PER_TICK: u8 = 1;

@@ -4,17 +4,20 @@ use crate::{
     host::{HOST_INTERFACE, HostInterface},
 };
 
-const PIN_MAGNET_SENSOR: u32 = 2;
+const PIN_MAGNET_SENSOR: u32 = 5;
 const PIN_BATTERY_LEVEL_IN: u32 = 26;
 
 pub unsafe fn init() {
     binding_gpio_set_dir(PIN_MAGNET_SENSOR, false);
     gpio_set_pulls(PIN_MAGNET_SENSOR, true, false);
 
-    // pin number has no effect
+
+    gpio_set_irq_enabled(PIN_MAGNET_SENSOR, GPIO_IRQ_EDGE_FALL, true);
+
+    // pin number and events params have no effect
     gpio_set_irq_enabled_with_callback(
         0,
-        GPIO_IRQ_EDGE_FALL,
+        0,
         true,
         Some(on_gpio),
     );

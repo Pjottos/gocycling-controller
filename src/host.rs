@@ -116,6 +116,7 @@ impl HostInterface {
         // execute_at_cmd(uart_dev, b"AT+LED2M=1");
 
         binding_gpio_set_dir(Self::PIN_CONNECTION_STATE, false);
+        // gpio_set_irq_enabled(Self::)
 
         HOST_INTERFACE = Some(Self {
             uart_dev,
