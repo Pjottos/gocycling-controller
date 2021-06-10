@@ -100,8 +100,6 @@ impl HostInterface {
     const TX_PIN: u32 = 0;
     const RX_PIN: u32 = 1;
 
-    pub const PIN_CONNECTION_STATE: u32 = 21;
-
     const LOST_CONNECTION_BUF_SIZE: usize = 64;
 
     const MAX_COMMAND_SIZE: usize = 64;
@@ -114,9 +112,6 @@ impl HostInterface {
 
         // turn off onboard led
         // execute_at_cmd(uart_dev, b"AT+LED2M=1");
-
-        binding_gpio_set_dir(Self::PIN_CONNECTION_STATE, false);
-        // gpio_set_irq_enabled(Self::)
 
         HOST_INTERFACE = Some(Self {
             uart_dev,
