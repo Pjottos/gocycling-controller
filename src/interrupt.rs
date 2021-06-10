@@ -1,7 +1,7 @@
 use crate::{
     binding::*,
     cycling,
-    host::{HostInterface, HOST_INTERFACE},
+    host::HOST_INTERFACE,
 };
 
 const PIN_MAGNET_SENSOR: u32 = 5;

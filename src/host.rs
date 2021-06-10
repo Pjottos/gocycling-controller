@@ -141,6 +141,7 @@ impl HostInterface {
                         self.lost_connection_item_count += 1;
                     } else {
                         // TODO: switch to offline mode?
+                        self.lost_connection_item_count = 0;
                         self.operating_mode = None;
                     }
                 }
@@ -150,18 +151,25 @@ impl HostInterface {
         }
     }
 
-    pub unsafe fn start(&mut self, mode: OperatingMode) {
-        self.operating_mode = Some(mode);
-
-        binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
-        binding_irq_set_enabled(UART0_IRQ, true);
-
-        binding_uart_set_irq_enables(self.uart_dev, true, false);
-    }
-
     pub fn connection_changed(&mut self, value: bool) {
-        if let Some(OperatingMode::Online { connected, .. }) = self.operating_mode.as_mut() {
-            *connected = value;
+        match self.operating_mode.as_mut() {
+            Some(OperatingMode::Online { connected, .. }) => *connected = value,
+            None => {
+                if value {
+                    self.operating_mode = Some(OperatingMode::Online {
+                        connected: true,
+                        started: false,
+                    });
+
+                    unsafe {
+                        binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
+                        binding_irq_set_enabled(UART0_IRQ, true);
+
+                        binding_uart_set_irq_enables(self.uart_dev, true, false);
+                    }
+                }
+            },
+            _ => (),
         }
     }
 
@@ -255,6 +263,9 @@ unsafe extern "C" fn on_uart0_rx() {
                 {
                     interface.execute_cmd(cmd);
                 }
+
+                // ready to receive a new command
+                interface.cur_cmd_len = 0;
             }
         }
     }
