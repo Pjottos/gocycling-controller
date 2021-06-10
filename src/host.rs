@@ -1,18 +1,11 @@
-use crate::{
-    binding::*,
-    ctypes::c_void,
-    cycling::CycleData,
-};
+use crate::{binding::*, ctypes::c_void, cycling::CycleData};
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
 #[derive(Clone, Copy)]
 pub enum OperatingMode {
     Offline,
-    Online {
-        started: bool,
-        connected: bool,
-    },
+    Online { started: bool, connected: bool },
 }
 
 #[derive(Debug)]
@@ -59,7 +52,7 @@ impl Command {
                     let datetime = datetime_t::from_bits(u64::from_le_bytes(bytes));
                     Some(Self::StartSession { datetime })
                 }
-            },
+            }
             _ => None,
         }
     }
@@ -77,8 +70,7 @@ impl Command {
     fn command_data<'a>(raw: &'a [u8]) -> &'a [u8] {
         if raw.len() < 2 {
             &raw[..0]
-        }
-        else {
+        } else {
             &raw[2..]
         }
     }
@@ -130,7 +122,10 @@ impl HostInterface {
             OperatingMode::Offline => todo!(),
             // TODO: should we return an error here?
             OperatingMode::Online { started: false, .. } => Ok(()),
-            OperatingMode::Online { started: true, connected } => unsafe {
+            OperatingMode::Online {
+                started: true,
+                connected,
+            } => unsafe {
                 if connected {
                     // send any cycles that were generated while the connection was lost
                     for item in &self.lost_connection_buf[0..self.lost_connection_item_count] {
@@ -139,21 +134,19 @@ impl HostInterface {
                     self.lost_connection_item_count = 0;
 
                     self.send_data(data)?;
-                }
-                else {
+                } else {
                     // record cycle data in a temporary buffer when the connection is temporarly lost
                     if self.lost_connection_item_count < Self::LOST_CONNECTION_BUF_SIZE {
                         self.lost_connection_buf[self.lost_connection_item_count] = *data;
                         self.lost_connection_item_count += 1;
-                    }
-                    else {
+                    } else {
                         // TODO: switch to offline mode?
                         self.operating_mode = None;
                     }
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 
@@ -180,11 +173,7 @@ impl HostInterface {
         buf_crc[0] = calc_crc8(used);
         let len = 1 + used.len();
 
-        binding_uart_write_blocking(
-            self.uart_dev,
-            buf[0..len].as_ptr(),
-            len as u32,
-        );
+        binding_uart_write_blocking(self.uart_dev, buf[0..len].as_ptr(), len as u32);
 
         Ok(())
     }
@@ -207,12 +196,11 @@ impl HostInterface {
 
 impl Drop for HostInterface {
     fn drop(&mut self) {
-        unsafe { 
+        unsafe {
             binding_uart_destroy(self.uart_dev);
         }
     }
 }
-
 
 fn calc_crc8(data: &[u8]) -> u8 {
     let mut crc = 0xFF;
@@ -222,8 +210,7 @@ fn calc_crc8(data: &[u8]) -> u8 {
         for _ in 0..8 {
             if (crc & 0x80) != 0 {
                 crc = (crc << 1) ^ 0x31;
-            }
-            else {
+            } else {
                 crc <<= 1;
             }
         }
@@ -232,8 +219,7 @@ fn calc_crc8(data: &[u8]) -> u8 {
     crc
 }
 
-
-/// Must be called only before the global HOST_INTERFACE is started, otherwise the 
+/// Must be called only before the global HOST_INTERFACE is started, otherwise the
 /// UART interrupt will interfere
 unsafe fn execute_at_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
     binding_uart_write_blocking(uart_dev, cmd.as_ptr(), cmd.len() as u32);
@@ -252,20 +238,21 @@ unsafe extern "C" fn on_uart0_rx() {
             if interface.cur_cmd_len == 0 {
                 if let Some(expected) = Command::expected_len(char) {
                     interface.expected_cmd_len = expected;
-                }
-                else {
+                } else {
                     continue;
                 }
             }
 
             // record the current command...
-            interface.cmd_receive_buffer[interface.cur_cmd_len] = char; 
+            interface.cmd_receive_buffer[interface.cur_cmd_len] = char;
             interface.cur_cmd_len += 1;
 
             // ... until we got the expected amount of bytes
             if interface.cur_cmd_len == interface.expected_cmd_len {
                 // and try to deserialize it
-                if let Some(cmd) = Command::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len]) {
+                if let Some(cmd) =
+                    Command::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
+                {
                     interface.execute_cmd(cmd);
                 }
             }

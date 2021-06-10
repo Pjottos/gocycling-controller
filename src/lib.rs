@@ -1,22 +1,17 @@
 #![no_std]
 #![feature(asm)]
 
-use crate::{
-    binding::*,
-    cycling::CycleData,
-    host::HostInterface,
-};
+use crate::{binding::*, cycling::CycleData, host::HostInterface};
 use core::panic::PanicInfo;
 use rgb::RgbLed;
 
 mod binding;
 mod ctypes;
 
-mod host;
 mod cycling;
-mod rgb;
+mod host;
 mod interrupt;
-
+mod rgb;
 
 const MODULES_STARTUP_MS: u32 = 350;
 

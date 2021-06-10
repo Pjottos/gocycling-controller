@@ -60,6 +60,7 @@ impl RgbLed {
     }
 }
 
+#[rustfmt::skip]
 fn hue_to_rgb_rainbow(hue: u8) -> (u8, u8, u8) {
     // Divide the hue range into 8 sections (3 bits)
     let section = (hue & 0xE0) >> 5;
