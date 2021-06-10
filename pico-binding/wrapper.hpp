@@ -1,6 +1,7 @@
 #include "boards/pico.h"
 #include "pico/stdio.h"
 #include "pico/stdlib.h"
+#include "hardware/sync.h"
 #include "hardware/irq.h"
 #include "hardware/uart.h"
 #include "hardware/gpio.h"
@@ -26,3 +27,6 @@ extern "C" uint binding_pwm_gpio_to_slice_num(uint gpio);
 extern "C" pwm_config binding_pwm_get_default_config();
 extern "C" void binding_pwm_init(uint slice_num, pwm_config *config, bool running);
 extern "C" void binding_pwm_set_gpio_level(uint gpio, uint16_t level);
+
+extern "C" uint32_t binding_save_and_disable_interrupts();
+extern "C" void binding_restore_interrupts(uint32_t status);

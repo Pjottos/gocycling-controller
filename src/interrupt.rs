@@ -13,6 +13,7 @@ pub unsafe fn init() {
     gpio_set_pulls(PIN_MAGNET_SENSOR, true, false);
 
     binding_gpio_set_dir(PIN_CONNECTION_STATE, false);
+    gpio_set_pulls(PIN_CONNECTION_STATE, true, false);
 
     gpio_set_irq_enabled(
         PIN_CONNECTION_STATE,

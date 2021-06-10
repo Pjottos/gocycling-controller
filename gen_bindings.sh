@@ -21,6 +21,7 @@ bindgen pico-binding/wrapper.hpp \
     --no-prepend-enum-name \
     --no-layout-tests \
     -- \
+    -m32 \
     -I pico-sdk/src/rp2_common/pico_stdio/include \
     -I pico-sdk/src/common/pico_stdlib/include \
     -I pico-sdk/src/common/pico_base/include \
@@ -33,6 +34,7 @@ bindgen pico-binding/wrapper.hpp \
     -I pico-sdk/src/rp2_common/hardware_irq/include \
     -I pico-sdk/src/rp2_common/hardware_pwm/include \
     -I pico-sdk/src/rp2_common/hardware_spi/include \
+    -I pico-sdk/src/rp2_common/hardware_sync/include \
     -I pico-sdk/src/rp2_common/hardware_rtc/include \
     -I pico-sdk/src/rp2040/hardware_regs/include \
     -I pico-sdk/src/rp2040/hardware_structs/include \

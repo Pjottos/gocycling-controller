@@ -1,4 +1,4 @@
-use crate::{binding::*, ctypes::c_void, cycling::CycleData};
+use crate::{binding::*, critical, ctypes::c_void, cycling::CycleData};
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
@@ -118,7 +118,10 @@ impl HostInterface {
     }
 
     pub fn push(&mut self, data: &CycleData) -> Result<(), Error> {
-        match self.operating_mode.ok_or(Error::NotRunning)? {
+        // copy the operating mode to make sure we're not reading a partially updated value
+        let mode = critical::run(|_| self.operating_mode);
+
+        match mode.ok_or(Error::NotRunning)? {
             OperatingMode::Offline => todo!(),
             // TODO: should we return an error here?
             OperatingMode::Online { started: false, .. } => Ok(()),
@@ -142,7 +145,7 @@ impl HostInterface {
                     } else {
                         // TODO: switch to offline mode?
                         self.lost_connection_item_count = 0;
-                        self.operating_mode = None;
+                        critical::run(|_| self.operating_mode = None);
                     }
                 }
 
@@ -152,25 +155,45 @@ impl HostInterface {
     }
 
     pub fn connection_changed(&mut self, value: bool) {
-        match self.operating_mode.as_mut() {
-            Some(OperatingMode::Online { connected, .. }) => *connected = value,
-            None => {
-                if value {
-                    self.operating_mode = Some(OperatingMode::Online {
-                        connected: true,
-                        started: false,
-                    });
-
-                    unsafe {
-                        binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
-                        binding_irq_set_enabled(UART0_IRQ, true);
-
-                        binding_uart_set_irq_enables(self.uart_dev, true, false);
-                    }
+        let enable_uart_irq = critical::run(|_| {
+            match self.operating_mode.as_mut() {
+                Some(OperatingMode::Online { connected, .. }) => {
+                    *connected = value;
+                    false
                 }
-            },
-            _ => (),
+                None => {
+                    if value {
+                        self.operating_mode = Some(OperatingMode::Online {
+                            connected: true,
+                            started: false,
+                        });
+
+                        true
+                    } else {
+                        false
+                    }
+                },
+                _ => false,
+            }
+        });
+
+        if enable_uart_irq {
+            unsafe {
+                binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
+                binding_irq_set_enabled(UART0_IRQ, true);
+
+                binding_uart_set_irq_enables(self.uart_dev, true, false);
+            }
         }
+    }
+
+    pub fn online(&self) -> Option<bool> {
+        critical::run(|_| {
+            self.operating_mode.map(|m| match m {
+                OperatingMode::Online {..} => true,
+                OperatingMode::Offline {..} => false,
+            })
+        })
     }
 
     unsafe fn send_data(&self, data: &CycleData) -> Result<(), Error> {
@@ -193,12 +216,14 @@ impl HostInterface {
     }
 
     fn cmd_start_session(&mut self, datetime: &mut datetime_t) {
-        if let Some(OperatingMode::Online { started, .. }) = self.operating_mode.as_mut() {
-            unsafe {
-                rtc_set_datetime(datetime);
-                *started = true;
+        critical::run(|_| {
+            if let Some(OperatingMode::Online { started, .. }) = self.operating_mode.as_mut() {
+                unsafe {
+                    rtc_set_datetime(datetime);
+                    *started = true;
+                }
             }
-        }
+        });
     }
 }
 

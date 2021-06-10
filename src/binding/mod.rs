@@ -25,10 +25,6 @@ pub const PICO_SMPS_MODE_PIN: u32 = 23;
 pub const PICO_FLOAT_SUPPORT_ROM_V1: u32 = 1;
 pub const PICO_DOUBLE_SUPPORT_ROM_V1: u32 = 1;
 pub const __bool_true_false_are_defined: u32 = 1;
-pub const _CPP_CPPCONFIG_WRAPPER: u32 = 1;
-pub const __WORDSIZE: u32 = 64;
-pub const __WORDSIZE_TIME64_COMPAT32: u32 = 1;
-pub const __SYSCALL_WORDSIZE: u32 = 64;
 pub const _GLIBCXX_CXX_CONFIG_H: u32 = 1;
 pub const _GLIBCXX_RELEASE: u32 = 10;
 pub const __GLIBCXX__: u32 = 20210422;
@@ -87,6 +83,10 @@ pub const __GLIBC__: u32 = 2;
 pub const __GLIBC_MINOR__: u32 = 32;
 pub const _SYS_CDEFS_H: u32 = 1;
 pub const __glibc_c99_flexarr_available: u32 = 1;
+pub const __WORDSIZE: u32 = 32;
+pub const __WORDSIZE32_SIZE_ULONG: u32 = 0;
+pub const __WORDSIZE32_PTRDIFF_LONG: u32 = 0;
+pub const __WORDSIZE_TIME64_COMPAT32: u32 = 0;
 pub const __LDOUBLE_REDIRECTS_TO_FLOAT128_ABI: u32 = 0;
 pub const __HAVE_GENERIC_SELECTION: u32 = 0;
 pub const _GLIBCXX_CPU_DEFINES: u32 = 1;
@@ -144,7 +144,7 @@ pub const _GLIBCXX_HAVE_HYPOTF: u32 = 1;
 pub const _GLIBCXX_HAVE_HYPOTL: u32 = 1;
 pub const _GLIBCXX_HAVE_ICONV: u32 = 1;
 pub const _GLIBCXX_HAVE_INT64_T: u32 = 1;
-pub const _GLIBCXX_HAVE_INT64_T_LONG: u32 = 1;
+pub const _GLIBCXX_HAVE_INT64_T_LONG_LONG: u32 = 1;
 pub const _GLIBCXX_HAVE_INTTYPES_H: u32 = 1;
 pub const _GLIBCXX_HAVE_ISINFF: u32 = 1;
 pub const _GLIBCXX_HAVE_ISINFL: u32 = 1;
@@ -252,6 +252,7 @@ pub const _GLIBCXX_PACKAGE_URL: &'static [u8; 1usize] = b"\0";
 pub const _GLIBCXX_PACKAGE__GLIBCXX_VERSION: &'static [u8; 15usize] = b"version-unused\0";
 pub const STDC_HEADERS: u32 = 1;
 pub const _GLIBCXX_DARWIN_USE_64_BIT_INODE: u32 = 1;
+pub const _GLIBCXX_FILE_OFFSET_BITS: u32 = 64;
 pub const _GLIBCXX11_USE_C99_COMPLEX: u32 = 1;
 pub const _GLIBCXX11_USE_C99_MATH: u32 = 1;
 pub const _GLIBCXX11_USE_C99_STDIO: u32 = 1;
@@ -266,7 +267,9 @@ pub const _GLIBCXX_ATOMIC_BUILTINS: u32 = 1;
 pub const _GLIBCXX_FULLY_DYNAMIC_STRING: u32 = 0;
 pub const _GLIBCXX_HAS_GTHREADS: u32 = 1;
 pub const _GLIBCXX_HOSTED: u32 = 1;
+pub const _GLIBCXX_PTRDIFF_T_IS_INT: u32 = 1;
 pub const _GLIBCXX_RES_LIMITS: u32 = 1;
+pub const _GLIBCXX_SIZE_T_IS_UINT: u32 = 1;
 pub const _GLIBCXX_STDIO_EOF: i32 = -1;
 pub const _GLIBCXX_STDIO_SEEK_CUR: u32 = 1;
 pub const _GLIBCXX_STDIO_SEEK_END: u32 = 2;
@@ -289,7 +292,6 @@ pub const _GLIBCXX_USE_FCHMOD: u32 = 1;
 pub const _GLIBCXX_USE_FCHMODAT: u32 = 1;
 pub const _GLIBCXX_USE_GETTIMEOFDAY: u32 = 1;
 pub const _GLIBCXX_USE_GET_NPROCS: u32 = 1;
-pub const _GLIBCXX_USE_INT128: u32 = 1;
 pub const _GLIBCXX_USE_LFS: u32 = 1;
 pub const _GLIBCXX_USE_LONG_LONG: u32 = 1;
 pub const _GLIBCXX_USE_LSTAT: u32 = 1;
@@ -324,13 +326,11 @@ pub const __GLIBC_USE_IEC_60559_FUNCS_EXT: u32 = 1;
 pub const __GLIBC_USE_IEC_60559_FUNCS_EXT_C2X: u32 = 1;
 pub const __GLIBC_USE_IEC_60559_TYPES_EXT: u32 = 1;
 pub const _BITS_TYPES_H: u32 = 1;
-pub const __TIMESIZE: u32 = 64;
+pub const __TIMESIZE: u32 = 32;
 pub const _BITS_TYPESIZES_H: u32 = 1;
-pub const __OFF_T_MATCHES_OFF64_T: u32 = 1;
-pub const __INO_T_MATCHES_INO64_T: u32 = 1;
-pub const __RLIM_T_MATCHES_RLIM64_T: u32 = 1;
-pub const __STATFS_MATCHES_STATFS64: u32 = 1;
-pub const __KERNEL_OLD_TIMEVAL_MATCHES_TIMEVAL64: u32 = 1;
+pub const __RLIM_T_MATCHES_RLIM64_T: u32 = 0;
+pub const __STATFS_MATCHES_STATFS64: u32 = 0;
+pub const __KERNEL_OLD_TIMEVAL_MATCHES_TIMEVAL64: u32 = 0;
 pub const __FD_SETSIZE: u32 = 1024;
 pub const _BITS_TIME64_H: u32 = 1;
 pub const _BITS_WCHAR_H: u32 = 1;
@@ -355,22 +355,22 @@ pub const UINT_LEAST8_MAX: u32 = 255;
 pub const UINT_LEAST16_MAX: u32 = 65535;
 pub const UINT_LEAST32_MAX: u32 = 4294967295;
 pub const INT_FAST8_MIN: i32 = -128;
-pub const INT_FAST16_MIN: i64 = -9223372036854775808;
-pub const INT_FAST32_MIN: i64 = -9223372036854775808;
+pub const INT_FAST16_MIN: i32 = -2147483648;
+pub const INT_FAST32_MIN: i32 = -2147483648;
 pub const INT_FAST8_MAX: u32 = 127;
-pub const INT_FAST16_MAX: u64 = 9223372036854775807;
-pub const INT_FAST32_MAX: u64 = 9223372036854775807;
+pub const INT_FAST16_MAX: u32 = 2147483647;
+pub const INT_FAST32_MAX: u32 = 2147483647;
 pub const UINT_FAST8_MAX: u32 = 255;
-pub const UINT_FAST16_MAX: i32 = -1;
-pub const UINT_FAST32_MAX: i32 = -1;
-pub const INTPTR_MIN: i64 = -9223372036854775808;
-pub const INTPTR_MAX: u64 = 9223372036854775807;
-pub const UINTPTR_MAX: i32 = -1;
-pub const PTRDIFF_MIN: i64 = -9223372036854775808;
-pub const PTRDIFF_MAX: u64 = 9223372036854775807;
+pub const UINT_FAST16_MAX: u32 = 4294967295;
+pub const UINT_FAST32_MAX: u32 = 4294967295;
+pub const INTPTR_MIN: i32 = -2147483648;
+pub const INTPTR_MAX: u32 = 2147483647;
+pub const UINTPTR_MAX: u32 = 4294967295;
+pub const PTRDIFF_MIN: i32 = -2147483648;
+pub const PTRDIFF_MAX: u32 = 2147483647;
 pub const SIG_ATOMIC_MIN: i32 = -2147483648;
 pub const SIG_ATOMIC_MAX: u32 = 2147483647;
-pub const SIZE_MAX: i32 = -1;
+pub const SIZE_MAX: u32 = 4294967295;
 pub const WINT_MIN: u32 = 0;
 pub const WINT_MAX: u32 = 4294967295;
 pub const INT8_WIDTH: u32 = 8;
@@ -391,19 +391,19 @@ pub const INT_LEAST64_WIDTH: u32 = 64;
 pub const UINT_LEAST64_WIDTH: u32 = 64;
 pub const INT_FAST8_WIDTH: u32 = 8;
 pub const UINT_FAST8_WIDTH: u32 = 8;
-pub const INT_FAST16_WIDTH: u32 = 64;
-pub const UINT_FAST16_WIDTH: u32 = 64;
-pub const INT_FAST32_WIDTH: u32 = 64;
-pub const UINT_FAST32_WIDTH: u32 = 64;
+pub const INT_FAST16_WIDTH: u32 = 32;
+pub const UINT_FAST16_WIDTH: u32 = 32;
+pub const INT_FAST32_WIDTH: u32 = 32;
+pub const UINT_FAST32_WIDTH: u32 = 32;
 pub const INT_FAST64_WIDTH: u32 = 64;
 pub const UINT_FAST64_WIDTH: u32 = 64;
-pub const INTPTR_WIDTH: u32 = 64;
-pub const UINTPTR_WIDTH: u32 = 64;
+pub const INTPTR_WIDTH: u32 = 32;
+pub const UINTPTR_WIDTH: u32 = 32;
 pub const INTMAX_WIDTH: u32 = 64;
 pub const UINTMAX_WIDTH: u32 = 64;
-pub const PTRDIFF_WIDTH: u32 = 64;
+pub const PTRDIFF_WIDTH: u32 = 32;
 pub const SIG_ATOMIC_WIDTH: u32 = 32;
-pub const SIZE_WIDTH: u32 = 64;
+pub const SIZE_WIDTH: u32 = 32;
 pub const WCHAR_WIDTH: u32 = 32;
 pub const WINT_WIDTH: u32 = 32;
 pub const PICO_SDK_VERSION_MAJOR: u32 = 1;
@@ -955,6 +955,16 @@ pub const PICO_UART_ENABLE_CRLF_SUPPORT: u32 = 1;
 pub const PICO_UART_DEFAULT_CRLF: u32 = 0;
 pub const PICO_DEFAULT_UART_BAUD_RATE: u32 = 115200;
 pub const PICO_DEFAULT_LED_PIN_INVERTED: u32 = 0;
+pub const PARAM_ASSERTIONS_ENABLED_SYNC: u32 = 0;
+pub const PICO_SPINLOCK_ID_IRQ: u32 = 9;
+pub const PICO_SPINLOCK_ID_TIMER: u32 = 10;
+pub const PICO_SPINLOCK_ID_HARDWARE_CLAIM: u32 = 11;
+pub const PICO_SPINLOCK_ID_OS1: u32 = 14;
+pub const PICO_SPINLOCK_ID_OS2: u32 = 15;
+pub const PICO_SPINLOCK_ID_STRIPED_FIRST: u32 = 16;
+pub const PICO_SPINLOCK_ID_STRIPED_LAST: u32 = 23;
+pub const PICO_SPINLOCK_ID_CLAIM_FREE_FIRST: u32 = 24;
+pub const PICO_SPINLOCK_ID_CLAIM_FREE_LAST: u32 = 31;
 pub const PICO_MAX_SHARED_IRQ_HANDLERS: u32 = 4;
 pub const PICO_DISABLE_SHARED_IRQ_HANDLERS: u32 = 0;
 pub const TIMER_IRQ_0: u32 = 0;
@@ -1071,8 +1081,8 @@ pub const M0PLUS_MPU_RASR_SRD_ACCESS: &'static [u8; 3usize] = b"RW\0";
 pub const M0PLUS_MPU_RASR_SIZE_ACCESS: &'static [u8; 3usize] = b"RW\0";
 pub const M0PLUS_MPU_RASR_ENABLE_ACCESS: &'static [u8; 3usize] = b"RW\0";
 pub const PICO_DEFAULT_IRQ_PRIORITY: u32 = 128;
-pub const PICO_LOWEST_IRQ_PRIORITY: u32 = 1;
-pub const PICO_HIGHEST_IRQ_PRIORITY: u32 = 255;
+pub const PICO_LOWEST_IRQ_PRIORITY: u32 = 255;
+pub const PICO_HIGHEST_IRQ_PRIORITY: u32 = 0;
 pub const PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY: u32 = 128;
 pub const PARAM_ASSERTIONS_ENABLED_IRQ: u32 = 0;
 pub const RTC_CLKDIV_M1_ACCESS: &'static [u8; 3usize] = b"RW\0";
@@ -1268,7 +1278,7 @@ pub const PWM_INTS_CH2_ACCESS: &'static [u8; 3usize] = b"RO\0";
 pub const PWM_INTS_CH1_ACCESS: &'static [u8; 3usize] = b"RO\0";
 pub const PWM_INTS_CH0_ACCESS: &'static [u8; 3usize] = b"RO\0";
 pub const PARAM_ASSERTIONS_ENABLED_PWM: u32 = 0;
-pub type std_size_t = crate::ctypes::c_ulong;
+pub type std_size_t = crate::ctypes::c_uint;
 pub type std_nullptr_t = *const crate::ctypes::c_void;
 extern "C" {
     pub fn __assert_fail(
@@ -1303,8 +1313,8 @@ pub type __int16_t = crate::ctypes::c_short;
 pub type __uint16_t = crate::ctypes::c_ushort;
 pub type __int32_t = crate::ctypes::c_int;
 pub type __uint32_t = crate::ctypes::c_uint;
-pub type __int64_t = crate::ctypes::c_long;
-pub type __uint64_t = crate::ctypes::c_ulong;
+pub type __int64_t = crate::ctypes::c_longlong;
+pub type __uint64_t = crate::ctypes::c_ulonglong;
 pub type __int_least8_t = __int8_t;
 pub type __uint_least8_t = __uint8_t;
 pub type __int_least16_t = __int16_t;
@@ -1313,19 +1323,19 @@ pub type __int_least32_t = __int32_t;
 pub type __uint_least32_t = __uint32_t;
 pub type __int_least64_t = __int64_t;
 pub type __uint_least64_t = __uint64_t;
-pub type __quad_t = crate::ctypes::c_long;
-pub type __u_quad_t = crate::ctypes::c_ulong;
-pub type __intmax_t = crate::ctypes::c_long;
-pub type __uintmax_t = crate::ctypes::c_ulong;
-pub type __dev_t = crate::ctypes::c_ulong;
+pub type __quad_t = crate::ctypes::c_longlong;
+pub type __u_quad_t = crate::ctypes::c_ulonglong;
+pub type __intmax_t = crate::ctypes::c_longlong;
+pub type __uintmax_t = crate::ctypes::c_ulonglong;
+pub type __dev_t = __uint64_t;
 pub type __uid_t = crate::ctypes::c_uint;
 pub type __gid_t = crate::ctypes::c_uint;
 pub type __ino_t = crate::ctypes::c_ulong;
-pub type __ino64_t = crate::ctypes::c_ulong;
+pub type __ino64_t = __uint64_t;
 pub type __mode_t = crate::ctypes::c_uint;
-pub type __nlink_t = crate::ctypes::c_ulong;
+pub type __nlink_t = crate::ctypes::c_uint;
 pub type __off_t = crate::ctypes::c_long;
-pub type __off64_t = crate::ctypes::c_long;
+pub type __off64_t = __int64_t;
 pub type __pid_t = crate::ctypes::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1334,32 +1344,33 @@ pub struct __fsid_t {
 }
 pub type __clock_t = crate::ctypes::c_long;
 pub type __rlim_t = crate::ctypes::c_ulong;
-pub type __rlim64_t = crate::ctypes::c_ulong;
+pub type __rlim64_t = __uint64_t;
 pub type __id_t = crate::ctypes::c_uint;
 pub type __time_t = crate::ctypes::c_long;
 pub type __useconds_t = crate::ctypes::c_uint;
 pub type __suseconds_t = crate::ctypes::c_long;
-pub type __suseconds64_t = crate::ctypes::c_long;
+pub type __suseconds64_t = __int64_t;
 pub type __daddr_t = crate::ctypes::c_int;
 pub type __key_t = crate::ctypes::c_int;
 pub type __clockid_t = crate::ctypes::c_int;
 pub type __timer_t = *mut crate::ctypes::c_void;
 pub type __blksize_t = crate::ctypes::c_long;
 pub type __blkcnt_t = crate::ctypes::c_long;
-pub type __blkcnt64_t = crate::ctypes::c_long;
+pub type __blkcnt64_t = __int64_t;
 pub type __fsblkcnt_t = crate::ctypes::c_ulong;
-pub type __fsblkcnt64_t = crate::ctypes::c_ulong;
+pub type __fsblkcnt64_t = __uint64_t;
 pub type __fsfilcnt_t = crate::ctypes::c_ulong;
-pub type __fsfilcnt64_t = crate::ctypes::c_ulong;
-pub type __fsword_t = crate::ctypes::c_long;
-pub type __ssize_t = crate::ctypes::c_long;
+pub type __fsfilcnt64_t = __uint64_t;
+pub type __fsword_t = crate::ctypes::c_int;
+pub type __ssize_t = crate::ctypes::c_int;
 pub type __syscall_slong_t = crate::ctypes::c_long;
 pub type __syscall_ulong_t = crate::ctypes::c_ulong;
 pub type __loff_t = __off64_t;
 pub type __caddr_t = *mut crate::ctypes::c_char;
-pub type __intptr_t = crate::ctypes::c_long;
+pub type __intptr_t = crate::ctypes::c_int;
 pub type __socklen_t = crate::ctypes::c_uint;
 pub type __sig_atomic_t = crate::ctypes::c_int;
+pub type __time64_t = __int64_t;
 pub type int_least8_t = __int_least8_t;
 pub type int_least16_t = __int_least16_t;
 pub type int_least32_t = __int_least32_t;
@@ -1369,23 +1380,22 @@ pub type uint_least16_t = __uint_least16_t;
 pub type uint_least32_t = __uint_least32_t;
 pub type uint_least64_t = __uint_least64_t;
 pub type int_fast8_t = crate::ctypes::c_schar;
-pub type int_fast16_t = crate::ctypes::c_long;
-pub type int_fast32_t = crate::ctypes::c_long;
-pub type int_fast64_t = crate::ctypes::c_long;
+pub type int_fast16_t = crate::ctypes::c_int;
+pub type int_fast32_t = crate::ctypes::c_int;
+pub type int_fast64_t = crate::ctypes::c_longlong;
 pub type uint_fast8_t = crate::ctypes::c_uchar;
-pub type uint_fast16_t = crate::ctypes::c_ulong;
-pub type uint_fast32_t = crate::ctypes::c_ulong;
-pub type uint_fast64_t = crate::ctypes::c_ulong;
+pub type uint_fast16_t = crate::ctypes::c_uint;
+pub type uint_fast32_t = crate::ctypes::c_uint;
+pub type uint_fast64_t = crate::ctypes::c_ulonglong;
 pub type intmax_t = __intmax_t;
 pub type uintmax_t = __uintmax_t;
-pub type size_t = crate::ctypes::c_ulong;
+pub type size_t = crate::ctypes::c_uint;
 #[repr(C)]
-#[repr(align(16))]
+#[repr(align(8))]
 #[derive(Debug, Copy, Clone)]
 pub struct max_align_t {
     pub __clang_max_align_nonce1: crate::ctypes::c_longlong,
-    pub __bindgen_padding_0: u64,
-    pub __clang_max_align_nonce2: u128,
+    pub __clang_max_align_nonce2: f64,
 }
 pub type uint = crate::ctypes::c_uint;
 #[repr(C)]
@@ -1459,7 +1469,7 @@ extern "C" {
     #[doc = " \\ingroup pico_stdio"]
     #[doc = ""]
     #[doc = " Call this method once you have set up your clocks to enable the stdio support for UART, USB"]
-    #[doc = " and semihosting based on the presence of the respective librariess in the binary."]
+    #[doc = " and semihosting based on the presence of the respective libraries in the binary."]
     #[doc = ""]
     #[doc = " \\see stdio_uart, stdio_usb, stdio_semihosting"]
     pub fn stdio_init_all();
@@ -1469,7 +1479,7 @@ extern "C" {
     #[doc = " \\ingroup pico_stdio"]
     #[doc = ""]
     #[doc = " Call this method once you have set up your clocks to enable the stdio support for UART, USB"]
-    #[doc = " and semihosting based on the presence of the respective librariess in the binary."]
+    #[doc = " and semihosting based on the presence of the respective libraries in the binary."]
     #[doc = ""]
     #[doc = " \\see stdio_uart, stdio_usb, stdio_semihosting"]
     pub fn stdio_flush();
@@ -1555,15 +1565,22 @@ extern "C" {
     #[doc = " \\brief Busy wait wasting cycles for the given (32 bit) number of microseconds"]
     #[doc = "  \\ingroup hardware_timer"]
     #[doc = ""]
-    #[doc = " \\param delay_us delay amount"]
+    #[doc = " \\param delay_us delay amount in microseconds"]
     pub fn busy_wait_us_32(delay_us: u32);
 }
 extern "C" {
     #[doc = " \\brief Busy wait wasting cycles for the given (64 bit) number of microseconds"]
     #[doc = "  \\ingroup hardware_timer"]
     #[doc = ""]
-    #[doc = " \\param delay_us delay amount"]
+    #[doc = " \\param delay_us delay amount in microseconds"]
     pub fn busy_wait_us(delay_us: u64);
+}
+extern "C" {
+    #[doc = " \\brief Busy wait wasting cycles for the given number of milliseconds"]
+    #[doc = "  \\ingroup hardware_timer"]
+    #[doc = ""]
+    #[doc = " \\param delay_ms delay amount in milliseconds"]
+    pub fn busy_wait_ms(delay_ms: u32);
 }
 extern "C" {
     #[doc = " \\brief Busy wait wasting cycles until after the specified timestamp"]
@@ -1595,6 +1612,15 @@ extern "C" {
     #[doc = " \\param alarm_num the hardware alarm to unclaim"]
     #[doc = " \\sa hardware_claiming"]
     pub fn hardware_alarm_unclaim(alarm_num: uint);
+}
+extern "C" {
+    #[doc = " \\brief Determine if a hardware alarm has been claimed"]
+    #[doc = "  \\ingroup hardware_timer"]
+    #[doc = ""]
+    #[doc = " \\param alarm_num the hardware alarm number"]
+    #[doc = " \\return true if claimed, false otherwise"]
+    #[doc = " \\see hardware_alarm_claim"]
+    pub fn hardware_alarm_is_claimed(alarm_num: uint) -> bool;
 }
 extern "C" {
     #[doc = " \\brief Enable/Disable a callback for a hardware timer on this core"]
@@ -1890,7 +1916,7 @@ pub struct sio_hw_t {
     pub gpio_in: io_ro_32,
     pub gpio_hi_in: io_ro_32,
     pub _pad: u32,
-    pub gpio_out: io_wo_32,
+    pub gpio_out: io_rw_32,
     pub gpio_set: io_wo_32,
     pub gpio_clr: io_wo_32,
     pub gpio_togl: io_wo_32,
@@ -1898,7 +1924,7 @@ pub struct sio_hw_t {
     pub gpio_oe_set: io_wo_32,
     pub gpio_oe_clr: io_wo_32,
     pub gpio_oe_togl: io_wo_32,
-    pub gpio_hi_out: io_wo_32,
+    pub gpio_hi_out: io_rw_32,
     pub gpio_hi_set: io_wo_32,
     pub gpio_hi_clr: io_wo_32,
     pub gpio_hi_togl: io_wo_32,
@@ -1936,7 +1962,7 @@ pub const GPIO_FUNC_PIO0: gpio_function = 6;
 pub const GPIO_FUNC_PIO1: gpio_function = 7;
 pub const GPIO_FUNC_GPCK: gpio_function = 8;
 pub const GPIO_FUNC_USB: gpio_function = 9;
-pub const GPIO_FUNC_NULL: gpio_function = 15;
+pub const GPIO_FUNC_NULL: gpio_function = 31;
 #[doc = " \\brief  GPIO function definitions for use with function select"]
 #[doc = "  \\ingroup hardware_gpio"]
 #[doc = " \\brief GPIO function selectors"]
@@ -1983,6 +2009,31 @@ pub const GPIO_OVERRIDE_LOW: gpio_override = 2;
 #[doc = "< drive high/enable output"]
 pub const GPIO_OVERRIDE_HIGH: gpio_override = 3;
 pub type gpio_override = crate::ctypes::c_uint;
+#[doc = "< Slew rate limiting enabled"]
+pub const GPIO_SLEW_RATE_SLOW: gpio_slew_rate = 0;
+#[doc = "< Slew rate limiting disabled"]
+pub const GPIO_SLEW_RATE_FAST: gpio_slew_rate = 1;
+#[doc = " \\brief Slew rate limiting levels for GPIO outputs"]
+#[doc = "  \\ingroup hardware_gpio"]
+#[doc = ""]
+#[doc = " Slew rate limiting increases the minimum rise/fall time when a GPIO output"]
+#[doc = " is lightly loaded, which can help to reduce electromagnetic emissions."]
+#[doc = " \\sa gpio_set_slew_rate"]
+pub type gpio_slew_rate = crate::ctypes::c_uint;
+#[doc = "< 2 mA nominal drive strength"]
+pub const GPIO_DRIVE_STRENGTH_2MA: gpio_drive_strength = 0;
+#[doc = "< 4 mA nominal drive strength"]
+pub const GPIO_DRIVE_STRENGTH_4MA: gpio_drive_strength = 1;
+#[doc = "< 8 mA nominal drive strength"]
+pub const GPIO_DRIVE_STRENGTH_8MA: gpio_drive_strength = 2;
+#[doc = "< 12 mA nominal drive strength"]
+pub const GPIO_DRIVE_STRENGTH_12MA: gpio_drive_strength = 3;
+#[doc = " \\brief Drive strength levels for GPIO outputs"]
+#[doc = "  \\ingroup hardware_gpio"]
+#[doc = ""]
+#[doc = " Drive strength levels for GPIO outputs."]
+#[doc = " \\sa gpio_set_drive_strength"]
+pub type gpio_drive_strength = crate::ctypes::c_uint;
 extern "C" {
     #[doc = " \\brief Select GPIO function"]
     #[doc = "  \\ingroup hardware_gpio"]
@@ -2005,6 +2056,16 @@ extern "C" {
     #[doc = " \\note On the RP2040, setting both pulls enables a \"bus keep\" function,"]
     #[doc = " i.e. a weak pull to whatever is current high/low state of GPIO."]
     pub fn gpio_set_pulls(gpio: uint, up: bool, down: bool);
+}
+extern "C" {
+    #[doc = " \\brief Set GPIO IRQ override"]
+    #[doc = "  \\ingroup hardware_gpio"]
+    #[doc = ""]
+    #[doc = " Optionally invert a GPIO IRQ signal, or drive it high or low"]
+    #[doc = ""]
+    #[doc = " \\param gpio GPIO number"]
+    #[doc = " \\param value See \\ref gpio_override"]
+    pub fn gpio_set_irqover(gpio: uint, value: uint);
 }
 extern "C" {
     #[doc = " \\brief Set GPIO output override"]
@@ -2037,6 +2098,64 @@ extern "C" {
     #[doc = " \\param gpio GPIO number"]
     #[doc = " \\param enabled true to enable input on specified GPIO"]
     pub fn gpio_set_input_enabled(gpio: uint, enabled: bool);
+}
+extern "C" {
+    #[doc = " \\brief Enable/disable GPIO input hysteresis (Schmitt trigger)"]
+    #[doc = "  \\ingroup hardware_gpio"]
+    #[doc = ""]
+    #[doc = " Enable or disable the Schmitt trigger hysteresis on a given GPIO. This is"]
+    #[doc = " enabled on all GPIOs by default. Disabling input hysteresis can lead to"]
+    #[doc = " inconsistent readings when the input signal has very long rise or fall"]
+    #[doc = " times, but slightly reduces the GPIO's input delay."]
+    #[doc = ""]
+    #[doc = " \\sa gpio_is_input_hysteresis_enabled"]
+    #[doc = " \\param gpio GPIO number"]
+    #[doc = " \\param enabled true to enable input hysteresis on specified GPIO"]
+    pub fn gpio_set_input_hysteresis_enabled(gpio: uint, enabled: bool);
+}
+extern "C" {
+    #[doc = " \\brief Determine whether input hysteresis is enabled on a specified GPIO"]
+    #[doc = "  \\ingroup hardware_gpio"]
+    #[doc = ""]
+    #[doc = " \\sa gpio_set_input_hysteresis_enabled"]
+    #[doc = " \\param gpio GPIO number"]
+    pub fn gpio_is_input_hysteresis_enabled(gpio: uint) -> bool;
+}
+extern "C" {
+    #[doc = " \\brief Set slew rate for a specified GPIO"]
+    #[doc = "  \\ingroup hardware_gpio"]
+    #[doc = ""]
+    #[doc = " \\sa gpio_get_slew_rate"]
+    #[doc = " \\param gpio GPIO number"]
+    #[doc = " \\param slew GPIO output slew rate"]
+    pub fn gpio_set_slew_rate(gpio: uint, slew: gpio_slew_rate);
+}
+extern "C" {
+    #[doc = " \\brief Determine current slew rate for a specified GPIO"]
+    #[doc = "  \\ingroup hardware_gpio"]
+    #[doc = ""]
+    #[doc = " \\sa gpio_set_slew_rate"]
+    #[doc = " \\param gpio GPIO number"]
+    #[doc = " \\return Current slew rate of that GPIO"]
+    pub fn gpio_get_slew_rate(gpio: uint) -> gpio_slew_rate;
+}
+extern "C" {
+    #[doc = " \\brief Set drive strength for a specified GPIO"]
+    #[doc = "  \\ingroup hardware_gpio"]
+    #[doc = ""]
+    #[doc = " \\sa gpio_get_drive_strength"]
+    #[doc = " \\param gpio GPIO number"]
+    #[doc = " \\param drive GPIO output drive strength"]
+    pub fn gpio_set_drive_strength(gpio: uint, drive: gpio_drive_strength);
+}
+extern "C" {
+    #[doc = " \\brief Determine current slew rate for a specified GPIO"]
+    #[doc = "  \\ingroup hardware_gpio"]
+    #[doc = ""]
+    #[doc = " \\sa gpio_set_drive_strength"]
+    #[doc = " \\param gpio GPIO number"]
+    #[doc = " \\return Current drive strength of that GPIO"]
+    pub fn gpio_get_drive_strength(gpio: uint) -> gpio_drive_strength;
 }
 extern "C" {
     #[doc = " \\brief Enable or disable interrupts for specified GPIO"]
@@ -2287,6 +2406,90 @@ extern "C" {
         post_div2_out: *mut uint,
     ) -> bool;
 }
+#[doc = " \\brief A spin lock identifier"]
+#[doc = " \\ingroup hardware_sync"]
+pub type spin_lock_t = u32;
+extern "C" {
+    #[doc = " \\brief Initialise a spin lock"]
+    #[doc = "  \\ingroup hardware_sync"]
+    #[doc = ""]
+    #[doc = " The spin lock is initially unlocked"]
+    #[doc = ""]
+    #[doc = " \\param lock_num The spin lock number"]
+    #[doc = " \\return The spin lock instance"]
+    pub fn spin_lock_init(lock_num: uint) -> *mut spin_lock_t;
+}
+extern "C" {
+    #[doc = " \\brief Release all spin locks"]
+    #[doc = "  \\ingroup hardware_sync"]
+    pub fn spin_locks_reset();
+}
+extern "C" {
+    #[doc = " \\brief Return a spin lock number from the _striped_ range"]
+    #[doc = "  \\ingroup hardware_sync"]
+    #[doc = ""]
+    #[doc = " Returns a spin lock number in the range PICO_SPINLOCK_ID_STRIPED_FIRST to PICO_SPINLOCK_ID_STRIPED_LAST"]
+    #[doc = " in a round robin fashion. This does not grant the caller exclusive access to the spin lock, so the caller"]
+    #[doc = " must:"]
+    #[doc = ""]
+    #[doc = " -# Abide (with other callers) by the contract of only holding this spin lock briefly (and with IRQs disabled - the default via \\ref spin_lock_blocking()),"]
+    #[doc = " and not whilst holding other spin locks."]
+    #[doc = " -# Be OK with any contention caused by the - brief due to the above requirement - contention with other possible users of the spin lock."]
+    #[doc = ""]
+    #[doc = " \\return lock_num a spin lock number the caller may use (non exclusively)"]
+    #[doc = " \\see PICO_SPINLOCK_ID_STRIPED_FIRST"]
+    #[doc = " \\see PICO_SPINLOCK_ID_STRIPED_LAST"]
+    pub fn next_striped_spin_lock_num() -> uint;
+}
+extern "C" {
+    #[doc = " \\brief Mark a spin lock as used"]
+    #[doc = "  \\ingroup hardware_sync"]
+    #[doc = ""]
+    #[doc = " Method for cooperative claiming of hardware. Will cause a panic if the spin lock"]
+    #[doc = " is already claimed. Use of this method by libraries detects accidental"]
+    #[doc = " configurations that would fail in unpredictable ways."]
+    #[doc = ""]
+    #[doc = " \\param lock_num the spin lock number"]
+    pub fn spin_lock_claim(lock_num: uint);
+}
+extern "C" {
+    #[doc = " \\brief Mark multiple spin locks as used"]
+    #[doc = "  \\ingroup hardware_sync"]
+    #[doc = ""]
+    #[doc = " Method for cooperative claiming of hardware. Will cause a panic if any of the spin locks"]
+    #[doc = " are already claimed. Use of this method by libraries detects accidental"]
+    #[doc = " configurations that would fail in unpredictable ways."]
+    #[doc = ""]
+    #[doc = " \\param lock_num_mask Bitfield of all required spin locks to claim (bit 0 == spin lock 0, bit 1 == spin lock 1 etc)"]
+    pub fn spin_lock_claim_mask(lock_num_mask: u32);
+}
+extern "C" {
+    #[doc = " \\brief Mark a spin lock as no longer used"]
+    #[doc = "  \\ingroup hardware_sync"]
+    #[doc = ""]
+    #[doc = " Method for cooperative claiming of hardware."]
+    #[doc = ""]
+    #[doc = " \\param lock_num the spin lock number to release"]
+    pub fn spin_lock_unclaim(lock_num: uint);
+}
+extern "C" {
+    #[doc = " \\brief Claim a free spin lock"]
+    #[doc = "  \\ingroup hardware_sync"]
+    #[doc = ""]
+    #[doc = " \\param required if true the function will panic if none are available"]
+    #[doc = " \\return the spin lock number or -1 if required was false, and none were free"]
+    pub fn spin_lock_claim_unused(required: bool) -> crate::ctypes::c_int;
+}
+extern "C" {
+    #[doc = " \\brief Determine if a spin lock is claimed"]
+    #[doc = "  \\ingroup hardware_sync"]
+    #[doc = ""]
+    #[doc = " \\param lock_num the spin lock number"]
+    #[doc = " \\return true if claimed, false otherwise"]
+    #[doc = " \\see spin_lock_claim"]
+    #[doc = " \\see spin_lock_claim_mask"]
+    pub fn spin_lock_is_claimed(lock_num: uint) -> bool;
+}
 #[doc = " \\brief Interrupt handler function type"]
 #[doc = "  \\ingroup hardware_irq"]
 #[doc = ""]
@@ -2297,9 +2500,12 @@ extern "C" {
     #[doc = "  \\ingroup hardware_irq"]
     #[doc = ""]
     #[doc = " \\param num Interrupt number"]
-    #[doc = " \\param hardware_priority Priority to set. Hardware priorities range from 0 (lowest) to 255 (highest) though only"]
-    #[doc = " the top 2 bits are significant on ARM Cortex M0+. To make it easier to specify higher or lower priorities"]
-    #[doc = " than the default, all IRQ priorities are initialized to PICO_DEFAULT_IRQ_PRIORITY by the SDK runtime at startup."]
+    #[doc = " \\param hardware_priority Priority to set."]
+    #[doc = " Numerically-lower values indicate a higher priority. Hardware priorities"]
+    #[doc = " range from 0 (highest priority) to 255 (lowest priority) though only the"]
+    #[doc = " top 2 bits are significant on ARM Cortex-M0+. To make it easier to specify"]
+    #[doc = " higher or lower priorities than the default, all IRQ priorities are"]
+    #[doc = " initialized to PICO_DEFAULT_IRQ_PRIORITY by the SDK runtime at startup."]
     #[doc = " PICO_DEFAULT_IRQ_PRIORITY defaults to 0x80"]
     pub fn irq_set_priority(num: uint, hardware_priority: u8);
 }
@@ -2416,7 +2622,7 @@ extern "C" {
     pub fn irq_set_pending(num: uint);
 }
 extern "C" {
-    #[doc = " \\brief Perform IRQ priority intiialization for the current core"]
+    #[doc = " \\brief Perform IRQ priority initialization for the current core"]
     #[doc = ""]
     #[doc = " \\note This is an internal method and user should generally not call it."]
     pub fn irq_init_priorities();
@@ -2587,4 +2793,10 @@ extern "C" {
 }
 extern "C" {
     pub fn binding_pwm_set_gpio_level(gpio: uint, level: u16);
+}
+extern "C" {
+    pub fn binding_save_and_disable_interrupts() -> u32;
+}
+extern "C" {
+    pub fn binding_restore_interrupts(status: u32);
 }

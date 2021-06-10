@@ -8,7 +8,6 @@ pub struct CycleData {
 
 pub unsafe fn handle_cycle() {
     static mut LAST_CYCLE_TIME: u64 = 0;
-
     const MIN_CYCLE_DELTA: u64 = 50_000;
 
     let time = time_us_64();

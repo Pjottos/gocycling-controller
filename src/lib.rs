@@ -1,19 +1,19 @@
 #![no_std]
 #![feature(asm)]
 
-use crate::{binding::*, cycling::CycleData, host::HostInterface};
+use crate::{binding::*, host::HostInterface};
 use core::panic::PanicInfo;
-use rgb::RgbLed;
 
 mod binding;
 mod ctypes;
 
+mod critical;
 mod cycling;
 mod host;
 mod interrupt;
 mod rgb;
 
-const MODULES_STARTUP_MS: u32 = 350;
+const MODULES_STARTUP_MS: u32 = 500;
 
 #[no_mangle]
 pub unsafe extern "C" fn main() -> ! {
@@ -26,13 +26,46 @@ pub unsafe extern "C" fn main() -> ! {
     interrupt::init();
     rtc_init();
 
-    let mode = wait_for_mode_select();
-
-    let host = host::HOST_INTERFACE.as_mut().unwrap();
-    host.start(mode);
+    let mut state = ProgramState::WaitForModeSelect { hue: 0 };
 
     loop {
-        sleep_ms(1);
+        state = state.execute();
+    }
+}
+
+enum ProgramState {
+    WaitForModeSelect { hue: u8 },
+    Running,
+}
+
+impl ProgramState {
+    unsafe fn execute(self) -> Self {
+        match self {
+            ProgramState::WaitForModeSelect { mut hue } => {
+                const TICK_MS: u32 = 3;
+                const HUE_PER_TICK: u8 = 1;
+
+                rgb::STATUS_LED.put_rainbow_hue(hue);
+
+                hue = hue.overflowing_add(HUE_PER_TICK).0;
+                sleep_ms(TICK_MS);
+
+                match host::HOST_INTERFACE.as_ref().unwrap().online() {
+                    Some(true) => {
+                        rgb::STATUS_LED.put_rgb(0, 0, u16::MAX);
+                        ProgramState::Running
+                    },
+                    Some(false) => {
+                        rgb::STATUS_LED.put_rgb(u16::MAX, 0, u16::MAX);
+                        ProgramState::Running
+                    }
+                    None => {
+                        ProgramState::WaitForModeSelect { hue }
+                    }
+                }
+            },
+            ProgramState::Running => ProgramState::Running,
+        }
     }
 }
 
@@ -47,24 +80,5 @@ fn handle_panic(_info: &PanicInfo) -> ! {
         loop {
             sleep_ms(1);
         }
-    }
-}
-
-unsafe fn wait_for_mode_select() -> host::OperatingMode {
-    // TODO
-    return host::OperatingMode::Online {
-        started: true,
-        connected: true,
-    };
-
-    const TICK_MS: u32 = 3;
-    const H_PER_TICK: u8 = 1;
-
-    let mut hue = 0;
-    loop {
-        rgb::STATUS_LED.put_rainbow_hue(hue);
-
-        hue = hue.overflowing_add(H_PER_TICK).0;
-        sleep_ms(TICK_MS);
     }
 }

@@ -74,3 +74,12 @@ void binding_pwm_init(uint slice_num, pwm_config *config, bool running) {
 void binding_pwm_set_gpio_level(uint gpio, uint16_t level) {
     pwm_set_gpio_level(gpio, level);
 }
+
+
+uint32_t binding_save_and_disable_interrupts() {
+    return save_and_disable_interrupts();
+}
+
+void binding_restore_interrupts(uint32_t status) {
+    restore_interrupts(status);
+}
