@@ -70,7 +70,6 @@ fn hue_to_rgb_rainbow(hue: u8) -> (u8, u8, u8) {
     // Various constants useful for calculating the RGB channel values
     const CONST_85: u8 = (256 / 3) as u8;
     const CONST_170: u8 = CONST_85 * 2;
-    const CONST_171: u8 = (256 - CONST_85 as u16) as u8;
 
     // Scale the section offset to use it for the channel values
     let offset = scale_u8(section_offset << 3, CONST_85);
@@ -85,13 +84,13 @@ fn hue_to_rgb_rainbow(hue: u8) -> (u8, u8, u8) {
         ),
         // orange -> yellow
         1 => (
-            CONST_171,
+            CONST_170,
             CONST_85 + offset,
             0,
         ),
         // yellow -> green
         2 => (
-            CONST_171 - offset_2,
+            CONST_170 - offset_2,
             CONST_170 + offset,
             0,
         ),
@@ -104,7 +103,7 @@ fn hue_to_rgb_rainbow(hue: u8) -> (u8, u8, u8) {
         // cyan -> blue
         4 => (
             0,
-            CONST_171 - offset_2,
+            CONST_170 - offset_2,
             CONST_85 + offset_2,
         ),
         // blue -> purple
@@ -113,13 +112,13 @@ fn hue_to_rgb_rainbow(hue: u8) -> (u8, u8, u8) {
             0,
             u8::MAX - offset,
         ),
-        // purple -> violet
+        // purple -> pink
         6 => (
             CONST_85 + offset,
             0,
-            CONST_171 - offset,
+            CONST_170 - offset,
         ),
-        // violet -> red
+        // pink -> red
         7 => (
             CONST_170 + offset,
             0,
