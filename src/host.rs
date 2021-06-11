@@ -1,4 +1,10 @@
-use crate::{binding::*, critical, ctypes::c_void, cycling::CycleData};
+use crate::{
+    binding::*,
+    critical,
+    ctypes::c_void,
+    cycling::{self, CycleData},
+    rgb,
+};
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
@@ -45,7 +51,7 @@ impl Command {
 
         match raw[0] {
             Self::CMD_START_SESSION => {
-                if data.len() != 7 || !Self::verify_crc8(raw) {
+                if data.len() != 5 || !Self::verify_crc8(raw) {
                     None
                 } else {
                     let bytes = [raw[2], raw[3], raw[4], raw[5], raw[6], 0, 0, 0];
@@ -100,10 +106,14 @@ impl HostInterface {
         let uart_dev = binding_uart0_init(Self::BAUD_RATE, Self::TX_PIN, Self::RX_PIN);
 
         // set device name
-        execute_at_cmd(uart_dev, b"AT+NAME=GoCycling");
+        // execute_at_cmd(uart_dev, b"AT+NAME=GoCycling");
+        // the module needs some time to execute the command
+        // it only starts executing after the response it seems
+        sleep_ms(50);
 
         // turn off onboard led
         // execute_at_cmd(uart_dev, b"AT+LED2M=1");
+        // sleep_ms(1000);
 
         HOST_INTERFACE = Some(Self {
             uart_dev,
@@ -155,6 +165,12 @@ impl HostInterface {
     }
 
     pub fn connection_changed(&mut self, value: bool) {
+        if value {
+            unsafe { rgb::STATUS_LED.put_rgb(0, 0, rgb::MAX_BRIGHTNESS) };
+        } else {
+            unsafe { rgb::STATUS_LED.put_rgb(rgb::MAX_BRIGHTNESS, 0, 0) };
+        }
+
         let enable_uart_irq = critical::run(|_| {
             match self.operating_mode.as_mut() {
                 Some(OperatingMode::Online { connected, .. }) => {
@@ -165,14 +181,15 @@ impl HostInterface {
                     if value {
                         self.operating_mode = Some(OperatingMode::Online {
                             connected: true,
-                            started: false,
+                            // TODO: tempory until bluetooth rx works properly
+                            started: true,
                         });
 
                         true
                     } else {
                         false
                     }
-                },
+                }
                 _ => false,
             }
         });
@@ -190,8 +207,8 @@ impl HostInterface {
     pub fn online(&self) -> Option<bool> {
         critical::run(|_| {
             self.operating_mode.map(|m| match m {
-                OperatingMode::Online {..} => true,
-                OperatingMode::Offline {..} => false,
+                OperatingMode::Online { .. } => true,
+                OperatingMode::Offline { .. } => false,
             })
         })
     }
@@ -217,11 +234,16 @@ impl HostInterface {
 
     fn cmd_start_session(&mut self, datetime: &mut datetime_t) {
         critical::run(|_| {
-            if let Some(OperatingMode::Online { started, .. }) = self.operating_mode.as_mut() {
+            if let Some(OperatingMode::Online {
+                started,
+                connected: true,
+            }) = self.operating_mode.as_mut()
+            {
                 unsafe {
                     rtc_set_datetime(datetime);
-                    *started = true;
+                    cycling::reset();
                 }
+                *started = true;
             }
         });
     }
@@ -265,11 +287,11 @@ unsafe fn execute_at_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
 unsafe extern "C" fn on_uart0_rx() {
     if let Some(interface) = HOST_INTERFACE.as_mut() {
         while binding_uart_is_readable(interface.uart_dev) {
-            let char = binding_uart_getc(interface.uart_dev);
+            let byte = binding_uart_getc(interface.uart_dev);
 
             // start receiving new command, discarding the byte if it is not a valid command
             if interface.cur_cmd_len == 0 {
-                if let Some(expected) = Command::expected_len(char) {
+                if let Some(expected) = Command::expected_len(byte) {
                     interface.expected_cmd_len = expected;
                 } else {
                     continue;
@@ -277,7 +299,7 @@ unsafe extern "C" fn on_uart0_rx() {
             }
 
             // record the current command...
-            interface.cmd_receive_buffer[interface.cur_cmd_len] = char;
+            interface.cmd_receive_buffer[interface.cur_cmd_len] = byte;
             interface.cur_cmd_len += 1;
 
             // ... until we got the expected amount of bytes
@@ -287,6 +309,8 @@ unsafe extern "C" fn on_uart0_rx() {
                     Command::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
                 {
                     interface.execute_cmd(cmd);
+                    // TOOD: temporary debug
+                    panic!();
                 }
 
                 // ready to receive a new command

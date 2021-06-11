@@ -6,8 +6,9 @@ pub struct CycleData {
     pub micros: u32,
 }
 
+static mut LAST_CYCLE_TIME: u64 = 0;
+
 pub unsafe fn handle_cycle() {
-    static mut LAST_CYCLE_TIME: u64 = 0;
     const MIN_CYCLE_DELTA: u64 = 50_000;
 
     let time = time_us_64();
@@ -20,7 +21,13 @@ pub unsafe fn handle_cycle() {
     let data = CycleData {
         micros: delta as u32,
     };
+
     if let Some(host) = host::HOST_INTERFACE.as_mut() {
+        // TODO: handle in main loop?
         host.push(&data).ok();
     }
+}
+
+pub unsafe fn reset() {
+    LAST_CYCLE_TIME = 0;
 }

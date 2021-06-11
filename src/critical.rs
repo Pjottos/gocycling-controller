@@ -11,11 +11,11 @@ impl<'a> CriticalSection<'a> {
         Self {
             _phantom: PhantomData,
         }
-    } 
+    }
 }
 
 pub fn run<F, R>(closure: F) -> R
-where 
+where
     F: FnOnce(&CriticalSection) -> R,
 {
     unsafe {

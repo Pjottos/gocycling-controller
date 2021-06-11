@@ -13,7 +13,7 @@ mod host;
 mod interrupt;
 mod rgb;
 
-const MODULES_STARTUP_MS: u32 = 500;
+const MODULES_STARTUP_MS: u32 = 350;
 
 #[no_mangle]
 pub unsafe extern "C" fn main() -> ! {
@@ -51,19 +51,10 @@ impl ProgramState {
                 sleep_ms(TICK_MS);
 
                 match host::HOST_INTERFACE.as_ref().unwrap().online() {
-                    Some(true) => {
-                        rgb::STATUS_LED.put_rgb(0, 0, u16::MAX);
-                        ProgramState::Running
-                    },
-                    Some(false) => {
-                        rgb::STATUS_LED.put_rgb(u16::MAX, 0, u16::MAX);
-                        ProgramState::Running
-                    }
-                    None => {
-                        ProgramState::WaitForModeSelect { hue }
-                    }
+                    Some(_) => ProgramState::Running,
+                    None => ProgramState::WaitForModeSelect { hue },
                 }
-            },
+            }
             ProgramState::Running => ProgramState::Running,
         }
     }
