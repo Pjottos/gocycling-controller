@@ -77,41 +77,49 @@ fn hue_to_rgb_rainbow(hue: u8) -> (u8, u8, u8) {
     let offset_2 = scale_u8(section_offset << 3, CONST_170);
 
     match section {
+        // red -> orange
         0 => (
             u8::MAX - offset,
             offset,
             0,
         ),
+        // orange -> yellow
         1 => (
             CONST_171,
             CONST_85 + offset,
             0,
         ),
+        // yellow -> green
         2 => (
             CONST_171 - offset_2,
             CONST_170 + offset,
             0,
         ),
+        // green -> cyan
         3 => (
             0,
             u8::MAX - offset,
             offset,
         ),
+        // cyan -> blue
         4 => (
             0,
             CONST_171 - offset_2,
             CONST_85 + offset_2,
         ),
+        // blue -> purple
         5 => (
             offset,
             0,
             u8::MAX - offset,
         ),
+        // purple -> violet
         6 => (
             CONST_85 + offset,
             0,
             CONST_171 - offset,
         ),
+        // violet -> red
         7 => (
             CONST_170 + offset,
             0,
