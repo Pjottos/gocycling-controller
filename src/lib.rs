@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(asm)]
 
-use crate::{binding::*, host::HostInterface};
+use crate::{binding::*, host::HostInterface, state::ProgramState};
 use core::panic::PanicInfo;
 
 mod binding;
@@ -12,13 +12,31 @@ mod cycling;
 mod host;
 mod interrupt;
 mod rgb;
+mod state;
 
-const MODULES_STARTUP_MS: u32 = 350;
+const MODULES_STARTUP_MS: u32 = 250;
+
+const PIN_STATUS_LED_R: u32 = 6;
+const PIN_STATUS_LED_G: u32 = 7;
+const PIN_STATUS_LED_B: u32 = 8;
+
+const PIN_BATTERY_LED_R: u32 = 2;
+const PIN_BATTERY_LED_G: u32 = 3;
+const PIN_BATTERY_LED_B: u32 = 4;
 
 #[no_mangle]
 pub unsafe extern "C" fn main() -> ! {
-    rgb::STATUS_LED.init();
-    rgb::BATTERY_LED.init();
+    let status_led = rgb::RgbLed::new(
+        PIN_STATUS_LED_R,
+        PIN_STATUS_LED_G,
+        PIN_STATUS_LED_B,
+    );
+    let mut old_status_hue: u8 = 0;
+    let battery_led: rgb::RgbLed = rgb::RgbLed::new(
+        PIN_BATTERY_LED_R,
+        PIN_BATTERY_LED_G,
+        PIN_BATTERY_LED_B,
+    );
 
     sleep_ms(MODULES_STARTUP_MS);
 
@@ -26,36 +44,33 @@ pub unsafe extern "C" fn main() -> ! {
     interrupt::init();
     rtc_init();
 
-    let mut state = ProgramState::WaitForModeSelect { hue: 0 };
-
     loop {
-        state = state.execute();
-    }
-}
-
-enum ProgramState {
-    WaitForModeSelect { hue: u8 },
-    Running,
-}
-
-impl ProgramState {
-    unsafe fn execute(self) -> Self {
-        match self {
+        let state = critical::run(|cs| state::retrieve(cs));
+        match state {
             ProgramState::WaitForModeSelect { mut hue } => {
                 const TICK_MS: u32 = 3;
                 const HUE_PER_TICK: u8 = 1;
-
-                rgb::STATUS_LED.put_rainbow_hue(hue);
+                status_led.put_rainbow_hue(hue);
+                old_status_hue = hue;
 
                 hue = hue.overflowing_add(HUE_PER_TICK).0;
                 sleep_ms(TICK_MS);
 
-                match host::HOST_INTERFACE.as_ref().unwrap().online() {
-                    Some(_) => ProgramState::Running,
-                    None => ProgramState::WaitForModeSelect { hue },
+                critical::run(|cs| {
+                    // don't overwrite a running state
+                    if let ProgramState::WaitForModeSelect { .. } = state::retrieve(cs) {
+                        state::store(cs, ProgramState::WaitForModeSelect { hue });
+                    }
+                });
+            },
+            ProgramState::Running { status_hue } => {
+                if status_hue != old_status_hue {
+                    status_led.put_rainbow_hue(status_hue);
+                    old_status_hue = status_hue;
                 }
+
+                asm!("wfe");
             }
-            ProgramState::Running => ProgramState::Running,
         }
     }
 }
@@ -69,7 +84,8 @@ fn handle_panic(_info: &PanicInfo) -> ! {
         binding_gpio_put(PIN_ONBOARD_LED, true);
 
         loop {
-            sleep_ms(1);
+            asm!("wfe");
         }
     }
 }
+

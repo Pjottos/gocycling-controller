@@ -1,18 +1,6 @@
 use crate::binding::*;
 
-pub const MAX_BRIGHTNESS: u16 = 0x0CFF;
-
-pub static mut BATTERY_LED: RgbLed = RgbLed {
-    r_pin: 2,
-    g_pin: 3,
-    b_pin: 4,
-};
-
-pub static mut STATUS_LED: RgbLed = RgbLed {
-    r_pin: 6,
-    g_pin: 7,
-    b_pin: 8,
-};
+pub const MAX_BRIGHTNESS: u16 = 0x0FFF;
 
 pub struct RgbLed {
     r_pin: u32,
@@ -21,13 +9,21 @@ pub struct RgbLed {
 }
 
 impl RgbLed {
-    pub unsafe fn init(&self) {
-        Self::init_pin(self.r_pin);
-        Self::init_pin(self.g_pin);
-        Self::init_pin(self.b_pin);
+    pub unsafe fn new(r_pin: u32, g_pin: u32, b_pin: u32) -> Self {
+        Self::init_pin(r_pin);
+        Self::init_pin(g_pin);
+        Self::init_pin(b_pin);
+
+        let led = RgbLed {
+            r_pin,
+            g_pin,
+            b_pin,
+        };
 
         // turn off until the led is needed
-        self.put_rgb(0, 0, 0);
+        led.put_rgb(0, 0, 0);
+
+        led
     }
 
     unsafe fn init_pin(pin: u32) {

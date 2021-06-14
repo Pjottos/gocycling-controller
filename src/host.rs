@@ -3,10 +3,12 @@ use crate::{
     critical,
     ctypes::c_void,
     cycling::{self, CycleData},
-    rgb,
+    state,
 };
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
+
+const CONNECTION_ALARM_NUM: u32 = 1;
 
 #[derive(Clone, Copy)]
 pub enum OperatingMode {
@@ -165,13 +167,23 @@ impl HostInterface {
     }
 
     pub fn connection_changed(&mut self, value: bool) {
-        if value {
-            unsafe { rgb::STATUS_LED.put_rgb(0, 0, rgb::MAX_BRIGHTNESS) };
-        } else {
-            unsafe { rgb::STATUS_LED.put_rgb(rgb::MAX_BRIGHTNESS, 0, 0) };
-        }
+        let enable_uart_irq = critical::run(|cs| {
+            if value {
+                state::store(cs, state::ProgramState::Running {
+                    status_hue: 160,
+                });
+            } else {
+                // TODO set alarm to change state to waitformode
+                state::store(cs, state::ProgramState::Running {
+                    status_hue: 0,
+                });
 
-        let enable_uart_irq = critical::run(|_| {
+//                 unsafe {
+//                     hardware_alarm_set_callback(CONNECTION_ALARM_NUM, );
+//                     hardware_alar
+//                 }
+            }
+
             match self.operating_mode.as_mut() {
                 Some(OperatingMode::Online { connected, .. }) => {
                     *connected = value;
@@ -182,7 +194,7 @@ impl HostInterface {
                         self.operating_mode = Some(OperatingMode::Online {
                             connected: true,
                             // TODO: tempory until bluetooth rx works properly
-                            started: true,
+                            started: false,
                         });
 
                         true
@@ -202,15 +214,6 @@ impl HostInterface {
                 binding_uart_set_irq_enables(self.uart_dev, true, false);
             }
         }
-    }
-
-    pub fn online(&self) -> Option<bool> {
-        critical::run(|_| {
-            self.operating_mode.map(|m| match m {
-                OperatingMode::Online { .. } => true,
-                OperatingMode::Offline { .. } => false,
-            })
-        })
     }
 
     unsafe fn send_data(&self, data: &CycleData) -> Result<(), Error> {
@@ -309,8 +312,6 @@ unsafe extern "C" fn on_uart0_rx() {
                     Command::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
                 {
                     interface.execute_cmd(cmd);
-                    // TOOD: temporary debug
-                    panic!();
                 }
 
                 // ready to receive a new command

@@ -9,6 +9,8 @@ void *binding_uart0_init(uint baud_rate, uint tx_pin, uint rx_pin) {
     uart_set_hw_flow(uart0, false, false);
     uart_set_format(uart0, 8, 1, UART_PARITY_NONE);
 
+    uart_set_fifo_enabled(uart0, false);
+
     return uart0;
 }
 
