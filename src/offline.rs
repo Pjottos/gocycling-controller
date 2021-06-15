@@ -1,11 +1,11 @@
 use crate::{binding::*, cycling::CycleData};
 
-pub struct BulkData {
+pub struct BulkCycleData {
     cycle_count: u16,
     micros: u32,
 }
 
-impl BulkData {
+impl BulkCycleData {
     pub fn new() -> Self {
         Self {
             cycle_count: 0,

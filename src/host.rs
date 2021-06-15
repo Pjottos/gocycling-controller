@@ -1,9 +1,9 @@
 use crate::{
     binding::*,
-    critical::{self, CriticalSection},
+    critical::CriticalSection,
     ctypes::c_void,
     cycling::{self, CycleData},
-    offline::BulkData,
+    offline::BulkCycleData,
     state,
 };
 
@@ -83,7 +83,7 @@ impl RxCommand {
 
 enum TxCommand {
     NotifyBulkDataAvailable { item_count: u16 },
-    BulkData(BulkData),
+    BulkData(BulkCycleData),
     LiveData(CycleData),
 }
 
