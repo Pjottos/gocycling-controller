@@ -64,6 +64,10 @@ pub unsafe extern "C" fn main() -> ! {
                     old_status_hue = status_hue;
                 }
 
+                // TODO: offline mode
+                host::HOST_INTERFACE.as_mut().unwrap().update();
+
+                // enter low power mode until an event occurs (e.g interrupt)
                 asm!("wfe");
             }
         }

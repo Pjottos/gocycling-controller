@@ -1,4 +1,4 @@
-use crate::{binding::*, host};
+use crate::{binding::*, critical::CriticalSection, host};
 use serde::Serialize;
 
 #[derive(Serialize, Clone, Copy, Default)]
@@ -8,7 +8,7 @@ pub struct CycleData {
 
 static mut LAST_CYCLE_TIME: u64 = 0;
 
-pub unsafe fn handle_cycle() {
+pub unsafe fn handle_cycle(cs: &CriticalSection) {
     const MIN_CYCLE_DELTA: u64 = 50_000;
 
     let time = time_us_64();
@@ -23,8 +23,7 @@ pub unsafe fn handle_cycle() {
     };
 
     if let Some(host) = host::HOST_INTERFACE.as_mut() {
-        // TODO: handle in main loop?
-        host.push_cycle(data).ok();
+        host.push_cycle(cs, data).ok();
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::{
     binding::*,
-    critical,
+    critical::{self, CriticalSection},
     ctypes::c_void,
     cycling::{self, CycleData},
     offline::BulkData,
@@ -11,16 +11,12 @@ pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
 const CONNECTION_ALARM_NUM: u32 = 1;
 
-#[derive(Clone, Copy)]
-pub enum OperatingMode {
-    Offline,
-    Online { started: bool, connected: bool },
-}
-
 #[derive(Debug)]
 pub enum Error {
     PostcardError(postcard::Error),
-    NotRunning,
+    NotStarted,
+    NoConnection,
+    BufferFull,
 }
 
 impl From<postcard::Error> for Error {
@@ -124,15 +120,19 @@ impl TxCommand {
     }
 }
 
+struct Connection {
+    connection_lost: bool,
+    started: bool,
+}
+
 pub struct HostInterface {
     uart_dev: *mut c_void,
-    operating_mode: Option<OperatingMode>,
-    lost_connection_buf: [CycleData; Self::LOST_CONNECTION_BUF_SIZE],
-    lost_connection_item_count: usize,
-    connection_lost_time: Option<u64>,
+    cycle_buf: [CycleData; Self::CYCLE_BUF_SIZE],
+    cycle_item_count: usize,
     cmd_receive_buffer: [u8; Self::MAX_COMMAND_SIZE],
     cur_cmd_len: usize,
     expected_cmd_len: usize,
+    connection: Option<Connection>,
 }
 
 impl HostInterface {
@@ -140,7 +140,7 @@ impl HostInterface {
     const TX_PIN: u32 = 0;
     const RX_PIN: u32 = 1;
 
-    const LOST_CONNECTION_BUF_SIZE: usize = 64;
+    const CYCLE_BUF_SIZE: usize = 64;
 
     const MAX_COMMAND_SIZE: usize = 64;
 
@@ -159,104 +159,84 @@ impl HostInterface {
 
         HOST_INTERFACE = Some(Self {
             uart_dev,
-            operating_mode: None,
-            lost_connection_buf: [CycleData::default(); Self::LOST_CONNECTION_BUF_SIZE],
-            lost_connection_item_count: 0,
-            connection_lost_time: None,
+            cycle_buf: [CycleData::default(); Self::CYCLE_BUF_SIZE],
+            cycle_item_count: 0,
             cmd_receive_buffer: [0u8; Self::MAX_COMMAND_SIZE],
             cur_cmd_len: 0,
             expected_cmd_len: 0,
+            connection: None,
         });
     }
 
-    pub fn push_cycle(&mut self, data: CycleData) -> Result<(), Error> {
-        // copy the operating mode to make sure we're not reading a partially updated value
-        let mode = critical::run(|_| self.operating_mode);
-
-        match mode.ok_or(Error::NotRunning)? {
-            OperatingMode::Offline => todo!(),
-            // TODO: should we return an error here?
-            OperatingMode::Online { started: false, .. } => Ok(()),
-            OperatingMode::Online {
-                started: true,
-                connected,
-            } => {
-                if connected {
-                    // send any cycles that were generated while the connection was lost
-                    for item in self.lost_connection_buf[0..self.lost_connection_item_count]
-                        .iter()
-                        .copied()
-                    {
-                        self.send_cmd(TxCommand::LiveData(item))?;
-                    }
-                    self.lost_connection_item_count = 0;
-
-                    self.send_cmd(TxCommand::LiveData(data))?;
+    pub fn push_cycle(&mut self, _: &CriticalSection, data: CycleData) -> Result<(), Error> {
+        match self.connection {
+            Some(Connection { started: true, .. }) => {
+                // record cycle data in a buffer that gets emptied in the main loop
+                if self.cycle_item_count < Self::CYCLE_BUF_SIZE {
+                    self.cycle_buf[self.cycle_item_count] = data;
+                    self.cycle_item_count += 1;
+                    Ok(())
                 } else {
-                    // record cycle data in a temporary buffer when the connection is temporarly lost
-                    if self.lost_connection_item_count < Self::LOST_CONNECTION_BUF_SIZE {
-                        self.lost_connection_buf[self.lost_connection_item_count] = data;
-                        self.lost_connection_item_count += 1;
-                    } else {
-                        // TODO: switch to offline mode?
-                        self.lost_connection_item_count = 0;
-                        critical::run(|_| self.operating_mode = None);
+                    Err(Error::BufferFull)
+                }
+            }
+            Some(Connection { started: false, .. }) => Err(Error::NotStarted),
+            None => Err(Error::NoConnection),
+        }
+    }
+
+    pub fn update(&mut self) {
+        if let Some(Connection {
+            connection_lost: false,
+            started: true,
+        }) = self.connection
+        {
+            // send any pending cycles
+            for item in self.cycle_buf[0..self.cycle_item_count].iter().copied() {
+                self.send_cmd(TxCommand::LiveData(item)).unwrap();
+            }
+            self.cycle_item_count = 0;
+        }
+
+        // do nothing if not connected, generated cycles will accumulate in the buffer
+    }
+
+    pub fn connection_changed(&mut self, cs: &CriticalSection, value: bool) {
+        if value {
+            state::store(cs, state::ProgramState::Running { status_hue: 160 });
+        } else {
+            // TODO set alarm to change state to waitformode
+            state::store(cs, state::ProgramState::Running { status_hue: 0 });
+
+            // unsafe {
+            //     hardware_alarm_set_callback(CONNECTION_ALARM_NUM, );
+            //     hardware_alar
+            // }
+        }
+
+        match self.connection.as_mut() {
+            Some(connection) => connection.connection_lost = !value,
+            None => {
+                if value {
+                    self.connection = Some(Connection {
+                        connection_lost: false,
+                        started: false,
+                    });
+
+                    unsafe {
+                        binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
+                        binding_irq_set_enabled(UART0_IRQ, true);
+
+                        binding_uart_set_irq_enables(self.uart_dev, true, false);
                     }
                 }
-
-                Ok(())
             }
         }
     }
 
-    pub fn connection_changed(&mut self, value: bool) {
-        let enable_uart_irq = critical::run(|cs| {
-            if value {
-                state::store(cs, state::ProgramState::Running { status_hue: 160 });
-            } else {
-                // TODO set alarm to change state to waitformode
-                state::store(cs, state::ProgramState::Running { status_hue: 0 });
-
-                // unsafe {
-                //     hardware_alarm_set_callback(CONNECTION_ALARM_NUM, );
-                //     hardware_alar
-                // }
-            }
-
-            match self.operating_mode.as_mut() {
-                Some(OperatingMode::Online { connected, .. }) => {
-                    *connected = value;
-                    false
-                }
-                None => {
-                    if value {
-                        self.operating_mode = Some(OperatingMode::Online {
-                            connected: true,
-                            started: false,
-                        });
-
-                        true
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            }
-        });
-
-        if enable_uart_irq {
-            unsafe {
-                binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
-                binding_irq_set_enabled(UART0_IRQ, true);
-
-                binding_uart_set_irq_enables(self.uart_dev, true, false);
-            }
-        }
-    }
-
-    fn execute_rx_cmd(&mut self, cmd: RxCommand) {
+    fn execute_rx_cmd(&mut self, cs: &CriticalSection, cmd: RxCommand) {
         match cmd {
-            RxCommand::StartSession { mut datetime } => self.cmd_start_session(&mut datetime),
+            RxCommand::StartSession { mut datetime } => self.cmd_start_session(cs, &mut datetime),
         }
     }
 
@@ -271,20 +251,18 @@ impl HostInterface {
         Ok(())
     }
 
-    fn cmd_start_session(&mut self, datetime: &mut datetime_t) {
-        critical::run(|_| {
-            if let Some(OperatingMode::Online {
-                started,
-                connected: true,
-            }) = self.operating_mode.as_mut()
-            {
-                unsafe {
-                    rtc_set_datetime(datetime);
-                    cycling::reset();
-                }
-                *started = true;
+    fn cmd_start_session(&mut self, _: &CriticalSection, datetime: &mut datetime_t) {
+        if let Some(Connection {
+            started,
+            connection_lost: false,
+        }) = self.connection.as_mut()
+        {
+            unsafe {
+                rtc_set_datetime(datetime);
+                cycling::reset();
             }
-        });
+            *started = true;
+        }
     }
 }
 
@@ -324,6 +302,9 @@ unsafe fn execute_at_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
 }
 
 unsafe extern "C" fn on_uart0_rx() {
+    // inside interrupt handler
+    let cs = CriticalSection::new();
+
     if let Some(interface) = HOST_INTERFACE.as_mut() {
         while binding_uart_is_readable(interface.uart_dev) {
             let byte = binding_uart_getc(interface.uart_dev);
@@ -347,7 +328,7 @@ unsafe extern "C" fn on_uart0_rx() {
                 if let Some(cmd) =
                     RxCommand::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
                 {
-                    interface.execute_rx_cmd(cmd);
+                    interface.execute_rx_cmd(&cs, cmd);
                 }
 
                 // ready to receive a new command
