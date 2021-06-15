@@ -24,7 +24,7 @@ pub unsafe fn handle_cycle() {
 
     if let Some(host) = host::HOST_INTERFACE.as_mut() {
         // TODO: handle in main loop?
-        host.push(&data).ok();
+        host.push_cycle(data).ok();
     }
 }
 

@@ -4,6 +4,7 @@ use crate::{
     ctypes::c_void,
     cycling::{self, CycleData},
     state,
+    offline::BulkData,
 };
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
@@ -28,11 +29,11 @@ impl From<postcard::Error> for Error {
     }
 }
 
-enum Command {
+enum RxCommand {
     StartSession { datetime: datetime_t },
 }
 
-impl Command {
+impl RxCommand {
     const CMD_START_SESSION: u8 = 1;
 
     fn expected_len(raw: u8) -> Option<usize> {
@@ -84,6 +85,34 @@ impl Command {
     }
 }
 
+enum TxCommand {
+    NotifyBulkDataAvailable { item_count: u16 },
+    BulkData(BulkData),
+    LiveData(CycleData),
+}
+
+impl TxCommand {
+    const MAX_CMD_SIZE: usize = 16;
+    const CMD_START_DATA_SYNC: u8 = 1;
+
+    fn serialize<'a>(self, buf: &'a mut [u8; Self::MAX_CMD_SIZE]) -> Result<&'a mut [u8], Error> {
+		match self {
+       		Self::NotifyBulkDataAvailable { item_count } => {
+				buf[0] = Self::CMD_START_DATA_SYNC;
+
+				let count_bytes = item_count.to_le_bytes();
+				buf[2..4].copy_from_slice(&count_bytes);
+
+				buf[1] = calc_crc8(&buf[2..4]);
+
+    			Ok(&mut buf[..4])
+    		},
+			_ => todo!(),
+		}
+    }
+}
+
+
 pub struct HostInterface {
     uart_dev: *mut c_void,
     operating_mode: Option<OperatingMode>,
@@ -111,7 +140,7 @@ impl HostInterface {
         // execute_at_cmd(uart_dev, b"AT+NAME=GoCycling");
         // the module needs some time to execute the command
         // it only starts executing after the response it seems
-        sleep_ms(50);
+        // sleep_ms(50);
 
         // turn off onboard led
         // execute_at_cmd(uart_dev, b"AT+LED2M=1");
@@ -129,7 +158,7 @@ impl HostInterface {
         });
     }
 
-    pub fn push(&mut self, data: &CycleData) -> Result<(), Error> {
+    pub fn push_cycle(&mut self, data: CycleData) -> Result<(), Error> {
         // copy the operating mode to make sure we're not reading a partially updated value
         let mode = critical::run(|_| self.operating_mode);
 
@@ -140,19 +169,19 @@ impl HostInterface {
             OperatingMode::Online {
                 started: true,
                 connected,
-            } => unsafe {
+            } => {
                 if connected {
                     // send any cycles that were generated while the connection was lost
-                    for item in &self.lost_connection_buf[0..self.lost_connection_item_count] {
-                        self.send_data(item)?;
+                    for item in self.lost_connection_buf[0..self.lost_connection_item_count].iter().copied() {
+                        self.send_cmd(TxCommand::LiveData(item))?;
                     }
                     self.lost_connection_item_count = 0;
 
-                    self.send_data(data)?;
+                    self.send_cmd(TxCommand::LiveData(data))?;
                 } else {
                     // record cycle data in a temporary buffer when the connection is temporarly lost
                     if self.lost_connection_item_count < Self::LOST_CONNECTION_BUF_SIZE {
-                        self.lost_connection_buf[self.lost_connection_item_count] = *data;
+                        self.lost_connection_buf[self.lost_connection_item_count] = data;
                         self.lost_connection_item_count += 1;
                     } else {
                         // TODO: switch to offline mode?
@@ -193,7 +222,6 @@ impl HostInterface {
                     if value {
                         self.operating_mode = Some(OperatingMode::Online {
                             connected: true,
-                            // TODO: tempory until bluetooth rx works properly
                             started: false,
                         });
 
@@ -216,24 +244,22 @@ impl HostInterface {
         }
     }
 
-    unsafe fn send_data(&self, data: &CycleData) -> Result<(), Error> {
-        let mut buf = [0u8; 20];
-        let (buf_crc, buf_data) = buf.split_at_mut(1);
-        let used = postcard::to_slice(data, buf_data)?;
-
-        buf_crc[0] = calc_crc8(used);
-        let len = 1 + used.len();
-
-        binding_uart_write_blocking(self.uart_dev, buf[0..len].as_ptr(), len as u32);
-
-        Ok(())
-    }
-
-    fn execute_cmd(&mut self, cmd: Command) {
+    fn execute_rx_cmd(&mut self, cmd: RxCommand) {
         match cmd {
-            Command::StartSession { mut datetime } => self.cmd_start_session(&mut datetime),
+            RxCommand::StartSession { mut datetime } => self.cmd_start_session(&mut datetime),
         }
     }
+
+    fn send_cmd(&self, cmd: TxCommand) -> Result<(), Error> {
+        let mut buf = [0u8; TxCommand::MAX_CMD_SIZE];
+		let used = cmd.serialize(&mut buf)?;
+
+		unsafe {
+            binding_uart_write_blocking(self.uart_dev, used.as_ptr(), used.len() as u32);
+		}
+
+		Ok(())
+	}
 
     fn cmd_start_session(&mut self, datetime: &mut datetime_t) {
         critical::run(|_| {
@@ -294,7 +320,7 @@ unsafe extern "C" fn on_uart0_rx() {
 
             // start receiving new command, discarding the byte if it is not a valid command
             if interface.cur_cmd_len == 0 {
-                if let Some(expected) = Command::expected_len(byte) {
+                if let Some(expected) = RxCommand::expected_len(byte) {
                     interface.expected_cmd_len = expected;
                 } else {
                     continue;
@@ -309,9 +335,9 @@ unsafe extern "C" fn on_uart0_rx() {
             if interface.cur_cmd_len == interface.expected_cmd_len {
                 // and try to deserialize it
                 if let Some(cmd) =
-                    Command::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
+                    RxCommand::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
                 {
-                    interface.execute_cmd(cmd);
+                    interface.execute_rx_cmd(cmd);
                 }
 
                 // ready to receive a new command

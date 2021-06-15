@@ -13,6 +13,7 @@ mod host;
 mod interrupt;
 mod rgb;
 mod state;
+mod offline;
 
 const MODULES_STARTUP_MS: u32 = 250;
 
