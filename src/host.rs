@@ -94,6 +94,7 @@ enum TxCommand {
 impl TxCommand {
     const MAX_CMD_SIZE: usize = 16;
     const CMD_START_DATA_SYNC: u8 = 1;
+    const CMD_LIVE_DATA: u8 = 2;
 
     fn serialize<'a>(self, buf: &'a mut [u8; Self::MAX_CMD_SIZE]) -> Result<&'a mut [u8], Error> {
 		match self {
@@ -106,6 +107,17 @@ impl TxCommand {
 				buf[1] = calc_crc8(&buf[2..4]);
 
     			Ok(&mut buf[..4])
+    		},
+    		Self::LiveData(data) => {
+        		let (buf_header, buf_data) = buf.split_at_mut(2);
+        		buf_header[0] = Self::CMD_LIVE_DATA;
+
+        		let used = postcard::to_slice(&data, buf_data)?;
+
+				buf_header[1] = calc_crc8(used);
+
+				let len = 2 + used.len();
+				Ok(&mut buf[..len])
     		},
 			_ => todo!(),
 		}

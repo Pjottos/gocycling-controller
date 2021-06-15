@@ -27,12 +27,11 @@ const PIN_BATTERY_LED_B: u32 = 4;
 
 #[no_mangle]
 pub unsafe extern "C" fn main() -> ! {
-    interrupt::init();
-
     // sleep_ms(MODULES_STARTUP_MS);
 
     HostInterface::create();
     rtc_init();
+    interrupt::init();
 
     let status_led = rgb::RgbLed::new(
         PIN_STATUS_LED_R,
