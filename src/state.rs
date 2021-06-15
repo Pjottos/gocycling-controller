@@ -1,11 +1,11 @@
 use crate::critical::CriticalSection;
 use core::cell::UnsafeCell;
 
-static STATE: StateWrapper = StateWrapper(UnsafeCell::new(ProgramState::WaitForModeSelect { hue: 0 }));
+static STATE: StateWrapper = StateWrapper(UnsafeCell::new(ProgramState::WaitForModeSelect));
 
 #[derive(Clone, Copy)]
 pub enum ProgramState {
-    WaitForModeSelect { hue: u8 },
+    WaitForModeSelect,
     Running { status_hue: u8 },
 }
 

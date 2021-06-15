@@ -26,6 +26,13 @@ const PIN_BATTERY_LED_B: u32 = 4;
 
 #[no_mangle]
 pub unsafe extern "C" fn main() -> ! {
+    interrupt::init();
+
+    // sleep_ms(MODULES_STARTUP_MS);
+
+    HostInterface::create();
+    rtc_init();
+
     let status_led = rgb::RgbLed::new(
         PIN_STATUS_LED_R,
         PIN_STATUS_LED_G,
@@ -38,28 +45,23 @@ pub unsafe extern "C" fn main() -> ! {
         PIN_BATTERY_LED_B,
     );
 
-    sleep_ms(MODULES_STARTUP_MS);
-
-    HostInterface::create();
-    interrupt::init();
-    rtc_init();
-
+	let mut rainbow_hue = 0;
     loop {
         let state = critical::run(|cs| state::retrieve(cs));
         match state {
-            ProgramState::WaitForModeSelect { mut hue } => {
+            ProgramState::WaitForModeSelect => {
                 const TICK_MS: u32 = 3;
                 const HUE_PER_TICK: u8 = 1;
-                status_led.put_rainbow_hue(hue);
-                old_status_hue = hue;
+                status_led.put_rainbow_hue(rainbow_hue);
+                old_status_hue = rainbow_hue;
 
-                hue = hue.overflowing_add(HUE_PER_TICK).0;
+                rainbow_hue  = rainbow_hue.overflowing_add(HUE_PER_TICK).0;
                 sleep_ms(TICK_MS);
 
                 critical::run(|cs| {
                     // don't overwrite a running state
-                    if let ProgramState::WaitForModeSelect { .. } = state::retrieve(cs) {
-                        state::store(cs, ProgramState::WaitForModeSelect { hue });
+                    if let ProgramState::WaitForModeSelect = state::retrieve(cs) {
+                        state::store(cs, ProgramState::WaitForModeSelect);
                     }
                 });
             },
