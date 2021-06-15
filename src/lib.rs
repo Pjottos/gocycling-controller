@@ -11,9 +11,9 @@ mod critical;
 mod cycling;
 mod host;
 mod interrupt;
+mod offline;
 mod rgb;
 mod state;
-mod offline;
 
 const MODULES_STARTUP_MS: u32 = 250;
 
@@ -33,19 +33,12 @@ pub unsafe extern "C" fn main() -> ! {
     rtc_init();
     interrupt::init();
 
-    let status_led = rgb::RgbLed::new(
-        PIN_STATUS_LED_R,
-        PIN_STATUS_LED_G,
-        PIN_STATUS_LED_B,
-    );
+    let status_led = rgb::RgbLed::new(PIN_STATUS_LED_R, PIN_STATUS_LED_G, PIN_STATUS_LED_B);
     let mut old_status_hue: u8 = 0;
-    let battery_led: rgb::RgbLed = rgb::RgbLed::new(
-        PIN_BATTERY_LED_R,
-        PIN_BATTERY_LED_G,
-        PIN_BATTERY_LED_B,
-    );
+    let battery_led: rgb::RgbLed =
+        rgb::RgbLed::new(PIN_BATTERY_LED_R, PIN_BATTERY_LED_G, PIN_BATTERY_LED_B);
 
-	let mut rainbow_hue = 0;
+    let mut rainbow_hue = 0;
     loop {
         let state = critical::run(|cs| state::retrieve(cs));
         match state {
@@ -55,7 +48,7 @@ pub unsafe extern "C" fn main() -> ! {
                 status_led.put_rainbow_hue(rainbow_hue);
                 old_status_hue = rainbow_hue;
 
-                rainbow_hue  = rainbow_hue.overflowing_add(HUE_PER_TICK).0;
+                rainbow_hue = rainbow_hue.overflowing_add(HUE_PER_TICK).0;
                 sleep_ms(TICK_MS);
 
                 critical::run(|cs| {
@@ -64,7 +57,7 @@ pub unsafe extern "C" fn main() -> ! {
                         state::store(cs, ProgramState::WaitForModeSelect);
                     }
                 });
-            },
+            }
             ProgramState::Running { status_hue } => {
                 if status_hue != old_status_hue {
                     status_led.put_rainbow_hue(status_hue);
@@ -90,4 +83,3 @@ fn handle_panic(_info: &PanicInfo) -> ! {
         }
     }
 }
-

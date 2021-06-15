@@ -3,8 +3,8 @@ use crate::{
     critical,
     ctypes::c_void,
     cycling::{self, CycleData},
-    state,
     offline::BulkData,
+    state,
 };
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
@@ -97,33 +97,32 @@ impl TxCommand {
     const CMD_LIVE_DATA: u8 = 2;
 
     fn serialize<'a>(self, buf: &'a mut [u8; Self::MAX_CMD_SIZE]) -> Result<&'a mut [u8], Error> {
-		match self {
-       		Self::NotifyBulkDataAvailable { item_count } => {
-				buf[0] = Self::CMD_START_DATA_SYNC;
+        match self {
+            Self::NotifyBulkDataAvailable { item_count } => {
+                buf[0] = Self::CMD_START_DATA_SYNC;
 
-				let count_bytes = item_count.to_le_bytes();
-				buf[2..4].copy_from_slice(&count_bytes);
+                let count_bytes = item_count.to_le_bytes();
+                buf[2..4].copy_from_slice(&count_bytes);
 
-				buf[1] = calc_crc8(&buf[2..4]);
+                buf[1] = calc_crc8(&buf[2..4]);
 
-    			Ok(&mut buf[..4])
-    		},
-    		Self::LiveData(data) => {
-        		let (buf_header, buf_data) = buf.split_at_mut(2);
-        		buf_header[0] = Self::CMD_LIVE_DATA;
+                Ok(&mut buf[..4])
+            }
+            Self::LiveData(data) => {
+                let (buf_header, buf_data) = buf.split_at_mut(2);
+                buf_header[0] = Self::CMD_LIVE_DATA;
 
-        		let used = postcard::to_slice(&data, buf_data)?;
+                let used = postcard::to_slice(&data, buf_data)?;
 
-				buf_header[1] = calc_crc8(used);
+                buf_header[1] = calc_crc8(used);
 
-				let len = 2 + used.len();
-				Ok(&mut buf[..len])
-    		},
-			_ => todo!(),
-		}
+                let len = 2 + used.len();
+                Ok(&mut buf[..len])
+            }
+            _ => todo!(),
+        }
     }
 }
-
 
 pub struct HostInterface {
     uart_dev: *mut c_void,
@@ -184,7 +183,10 @@ impl HostInterface {
             } => {
                 if connected {
                     // send any cycles that were generated while the connection was lost
-                    for item in self.lost_connection_buf[0..self.lost_connection_item_count].iter().copied() {
+                    for item in self.lost_connection_buf[0..self.lost_connection_item_count]
+                        .iter()
+                        .copied()
+                    {
                         self.send_cmd(TxCommand::LiveData(item))?;
                     }
                     self.lost_connection_item_count = 0;
@@ -203,26 +205,22 @@ impl HostInterface {
                 }
 
                 Ok(())
-            },
+            }
         }
     }
 
     pub fn connection_changed(&mut self, value: bool) {
         let enable_uart_irq = critical::run(|cs| {
             if value {
-                state::store(cs, state::ProgramState::Running {
-                    status_hue: 160,
-                });
+                state::store(cs, state::ProgramState::Running { status_hue: 160 });
             } else {
                 // TODO set alarm to change state to waitformode
-                state::store(cs, state::ProgramState::Running {
-                    status_hue: 0,
-                });
+                state::store(cs, state::ProgramState::Running { status_hue: 0 });
 
-//                 unsafe {
-//                     hardware_alarm_set_callback(CONNECTION_ALARM_NUM, );
-//                     hardware_alar
-//                 }
+                // unsafe {
+                //     hardware_alarm_set_callback(CONNECTION_ALARM_NUM, );
+                //     hardware_alar
+                // }
             }
 
             match self.operating_mode.as_mut() {
@@ -264,14 +262,14 @@ impl HostInterface {
 
     fn send_cmd(&self, cmd: TxCommand) -> Result<(), Error> {
         let mut buf = [0u8; TxCommand::MAX_CMD_SIZE];
-		let used = cmd.serialize(&mut buf)?;
+        let used = cmd.serialize(&mut buf)?;
 
-		unsafe {
+        unsafe {
             binding_uart_write_blocking(self.uart_dev, used.as_ptr(), used.len() as u32);
-		}
+        }
 
-		Ok(())
-	}
+        Ok(())
+    }
 
     fn cmd_start_session(&mut self, datetime: &mut datetime_t) {
         critical::run(|_| {

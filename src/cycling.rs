@@ -31,4 +31,3 @@ pub unsafe fn handle_cycle() {
 pub unsafe fn reset() {
     LAST_CYCLE_TIME = time_us_64();
 }
-
