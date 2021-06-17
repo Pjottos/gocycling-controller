@@ -1,4 +1,4 @@
-use crate::{binding::*, offline, critical::CriticalSection, host};
+use crate::{binding::*, critical::CriticalSection, host, offline};
 use serde::Serialize;
 
 #[derive(Serialize, Clone, Copy, Default)]
@@ -17,7 +17,9 @@ pub fn handle_cycle(cs: &CriticalSection) {
         return;
     }
 
-    unsafe { LAST_CYCLE_TIME = time; }
+    unsafe {
+        LAST_CYCLE_TIME = time;
+    }
     let data = CycleData {
         micros: delta as u32,
     };
@@ -32,5 +34,7 @@ pub fn handle_cycle(cs: &CriticalSection) {
 }
 
 pub fn reset(_: &CriticalSection) {
-    unsafe { LAST_CYCLE_TIME = time_us_64(); }
+    unsafe {
+        LAST_CYCLE_TIME = time_us_64();
+    }
 }

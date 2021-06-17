@@ -1,7 +1,14 @@
-use crate::{binding::*, critical::CriticalSection, cycling::CycleData};
+use crate::{
+    binding::*,
+    critical::{self, CriticalSection},
+    cycling::CycleData,
+    state::{self, ProgramState},
+};
 use serde::Serialize;
 
 static mut CURRENT_BULK: BulkCycleData = BulkCycleData::new();
+
+const OFFLINE_MODE_HUE: u8 = 220;
 
 pub struct BulkFull;
 
@@ -12,14 +19,14 @@ pub struct BulkCycleData {
 }
 
 impl BulkCycleData {
-    const fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             millis: 0,
             cycle_count: 0,
         }
     }
 
-    fn add_cycle(&mut self, data: &CycleData) -> Result<(), BulkFull> {
+    pub fn add_cycle(&mut self, data: &CycleData) -> Result<(), BulkFull> {
         let millis_result = self.millis.overflowing_add(data.micros / 1000);
 
         if self.cycle_count == u16::MAX || millis_result.1 {
@@ -34,20 +41,24 @@ impl BulkCycleData {
 }
 
 pub fn update(_: &CriticalSection) {
-	// TODO:
+    // TODO:
 }
 
 pub fn add_cycle(cs: &CriticalSection, data: &CycleData) {
-	unsafe {
-		if CURRENT_BULK.add_cycle(data).is_err() {
-			save_session_and_start_new(cs);
-			// impossible to recurse more than once because start_new_session resets all fields
-			add_cycle(cs, data);
-		}
-	}
+    unsafe {
+        if CURRENT_BULK.add_cycle(data).is_err() {
+            save_session_and_start_new(cs);
+            // impossible to recurse more than once because start_new_session resets all fields
+            add_cycle(cs, data);
+        }
+    }
 }
 
 pub fn save_session_and_start_new(_: &CriticalSection) {
     todo!()
+}
+
+pub fn continue_session(cs: &CriticalSection, session: BulkCycleData) {
+    state::store(cs, ProgramState::Running { status_hue: OFFLINE_MODE_HUE });
 }
 

@@ -3,14 +3,14 @@ use crate::{
     critical::{self, CriticalSection},
     ctypes::c_void,
     cycling::{self, CycleData},
-    offline::BulkCycleData,
-    state,
+    offline::{self, BulkCycleData},
+    state::{self, ProgramState},
 };
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
 const CONNECTION_ALARM_NUM: u32 = 1;
-const CONNECTION_TIMEOUT_US: u64 = 10_000_000;
+const RECONNECT_TIMEOUT_US: u64 = 10_000_000;
 
 const CONNECTED_HUE: u8 = 160;
 const RECONNECTING_HUE: u8 = 0;
@@ -99,13 +99,13 @@ impl TxCommand {
         let (buf_header, buf_data) = buf.split_at_mut(2);
 
         let data_len = match self {
-			Self::BulkData(data) => {
-				buf_header[0] = Self::CMD_BULK_DATA;
+            Self::BulkData(data) => {
+                buf_header[0] = Self::CMD_BULK_DATA;
 
                 let used = postcard::to_slice(&data, buf_data)?;
 
                 used.len()
-			},
+            }
             Self::LiveData(data) => {
                 buf_header[0] = Self::CMD_LIVE_DATA;
 
@@ -124,6 +124,7 @@ impl TxCommand {
 struct Connection {
     connection_lost: bool,
     started: bool,
+    session: BulkCycleData,
 }
 
 pub struct HostInterface {
@@ -187,16 +188,21 @@ impl HostInterface {
     }
 
     pub fn update(&mut self) {
-        if let Some(Connection {
-            connection_lost: false,
-            started: true,
-        }) = self.connection
-        {
-            // send any pending cycles
-            for item in self.cycle_buf[0..self.cycle_item_count].iter().copied() {
-                self.send_cmd(TxCommand::LiveData(item)).unwrap();
+        if let Some(mut connection) = self.connection.take() {
+            if !connection.connection_lost && connection.started {
+                // send any pending cycles
+                for item in self.cycle_buf[0..self.cycle_item_count].iter().copied() {
+                    // in the rare event that the sesison cannot hold any more cycles,
+                    // discard all cycles that do not fit.
+                    // the cycles will still be sent over bluetooth and if the session
+                    // is continued offline a new session will be started right away.
+                    connection.session.add_cycle(&item).ok();
+                    self.send_cmd(TxCommand::LiveData(item)).unwrap();
+                }
+                self.cycle_item_count = 0;
             }
-            self.cycle_item_count = 0;
+
+            self.connection = Some(connection);
         }
 
         // do nothing if not connected, generated cycles will accumulate in the buffer
@@ -206,39 +212,60 @@ impl HostInterface {
         self.connection.is_some()
     }
 
-    pub fn connection_changed(&mut self, cs: &CriticalSection, value: bool) {
-        if value {
-            state::store(cs, state::ProgramState::Running { status_hue: CONNECTED_HUE });
+    fn start_reconnecting(cs: &CriticalSection) {
+        state::store(
+            cs,
+            ProgramState::Running {
+                status_hue: RECONNECTING_HUE,
+            },
+        );
 
-            unsafe {
-                // if we were hoping to reconnect
-                if hardware_alarm_is_claimed(CONNECTION_ALARM_NUM) {
-                    // cancel alarm
-                    hardware_alarm_unclaim(CONNECTION_ALARM_NUM);
-                    hardware_alarm_cancel(CONNECTION_ALARM_NUM);
-                }
-            }
-        } else {
-            state::store(cs, state::ProgramState::Running { status_hue: RECONNECTING_HUE });
+        unsafe {
+            let connection_gone_time = absolute_time_t {
+                _private_us_since_boot: time_us_64() + RECONNECT_TIMEOUT_US,
+            };
 
-            unsafe {
-                let connection_gone_time = absolute_time_t {
-                    _private_us_since_boot: time_us_64() + CONNECTION_TIMEOUT_US,
-                };
-
-                hardware_alarm_claim(CONNECTION_ALARM_NUM);
-                hardware_alarm_set_callback(CONNECTION_ALARM_NUM, Some(on_connection_alarm));
-                hardware_alarm_set_target(CONNECTION_ALARM_NUM, connection_gone_time);
-            }
+            hardware_alarm_claim(CONNECTION_ALARM_NUM);
+            hardware_alarm_set_callback(CONNECTION_ALARM_NUM, Some(on_connection_alarm));
+            hardware_alarm_set_target(CONNECTION_ALARM_NUM, connection_gone_time);
         }
-
+    }
+ 
+    pub fn connection_changed(&mut self, cs: &CriticalSection, value: bool) {
         match self.connection.as_mut() {
-            Some(connection) => connection.connection_lost = !value,
+            Some(connection) => {
+                connection.connection_lost = !value;
+
+				if connection.connection_lost {
+    				if connection.started {
+        				Self::start_reconnecting(cs);
+   					} else {
+						// no session was active, return to mode select
+						state::store(cs, ProgramState::WaitForModeSelect);
+    				}
+				} else {
+                    state::store(
+                        cs,
+                        ProgramState::Running {
+                            status_hue: CONNECTED_HUE,
+                        },
+                    );
+
+                    unsafe {
+                        // cancel alarm, we successfully reconnected
+                        // does nothing if alarm was not set (when a connection is made
+                        // but no session is active)
+                        hardware_alarm_unclaim(CONNECTION_ALARM_NUM);
+                        hardware_alarm_cancel(CONNECTION_ALARM_NUM);
+                    }
+				}
+        	},
             None => {
                 if value {
                     self.connection = Some(Connection {
                         connection_lost: false,
                         started: false,
+                        session: BulkCycleData::new(),
                     });
 
                     unsafe {
@@ -247,6 +274,8 @@ impl HostInterface {
 
                         binding_uart_set_irq_enables(self.uart_dev, true, false);
                     }
+
+                    state::store(cs, ProgramState::Running { status_hue: CONNECTED_HUE });
                 }
             }
         }
@@ -273,6 +302,7 @@ impl HostInterface {
         if let Some(Connection {
             started,
             connection_lost: false,
+            ..
         }) = self.connection.as_mut()
         {
             unsafe {
@@ -321,7 +351,7 @@ unsafe fn execute_at_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
 
 unsafe extern "C" fn on_uart0_rx() {
     // inside interrupt handler
-    let cs = CriticalSection::new();
+    let cs = &CriticalSection::new();
 
     if let Some(interface) = HOST_INTERFACE.as_mut() {
         while binding_uart_is_readable(interface.uart_dev) {
@@ -346,7 +376,7 @@ unsafe extern "C" fn on_uart0_rx() {
                 if let Some(cmd) =
                     RxCommand::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
                 {
-                    interface.execute_rx_cmd(&cs, cmd);
+                    interface.execute_rx_cmd(cs, cmd);
                 }
 
                 // ready to receive a new command
@@ -357,9 +387,20 @@ unsafe extern "C" fn on_uart0_rx() {
 }
 
 unsafe extern "C" fn on_connection_alarm(alarm_num: u32) {
+    let cs = &CriticalSection::new();
+
     if alarm_num == CONNECTION_ALARM_NUM {
-        critical::run(|cs| state::store(cs, state::ProgramState::WaitForModeSelect));
+        if let Some(interface) = HOST_INTERFACE.as_mut() {
+            if interface
+                .connection
+                .as_ref()
+                .map(|c| c.started)
+                .unwrap_or(false)
+            {
+                let connection = interface.connection.take().unwrap();
+                offline::continue_session(cs, connection.session);
+            }
+        }
         hardware_alarm_unclaim(CONNECTION_ALARM_NUM);
     }
 }
-
