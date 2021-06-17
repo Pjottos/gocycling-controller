@@ -1,6 +1,6 @@
 use crate::{
     binding::*,
-    critical::CriticalSection,
+    critical::{self, CriticalSection},
     ctypes::c_void,
     cycling::{self, CycleData},
     offline::BulkCycleData,
@@ -10,6 +10,10 @@ use crate::{
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
 const CONNECTION_ALARM_NUM: u32 = 1;
+const CONNECTION_TIMEOUT_US: u64 = 10_000_000;
+
+const CONNECTED_HUE: u8 = 160;
+const RECONNECTING_HUE: u8 = 0;
 
 #[derive(Debug)]
 pub enum Error {
@@ -204,15 +208,28 @@ impl HostInterface {
 
     pub fn connection_changed(&mut self, cs: &CriticalSection, value: bool) {
         if value {
-            state::store(cs, state::ProgramState::Running { status_hue: 160 });
-        } else {
-            // TODO set alarm to change state to waitformode
-            state::store(cs, state::ProgramState::Running { status_hue: 0 });
+            state::store(cs, state::ProgramState::Running { status_hue: CONNECTED_HUE });
 
-            // unsafe {
-            //     hardware_alarm_set_callback(CONNECTION_ALARM_NUM, );
-            //     hardware_alar
-            // }
+            unsafe {
+                // if we were hoping to reconnect
+                if hardware_alarm_is_claimed(CONNECTION_ALARM_NUM) {
+                    // cancel alarm
+                    hardware_alarm_unclaim(CONNECTION_ALARM_NUM);
+                    hardware_alarm_cancel(CONNECTION_ALARM_NUM);
+                }
+            }
+        } else {
+            state::store(cs, state::ProgramState::Running { status_hue: RECONNECTING_HUE });
+
+            unsafe {
+                let connection_gone_time = absolute_time_t {
+                    _private_us_since_boot: time_us_64() + CONNECTION_TIMEOUT_US,
+                };
+
+                hardware_alarm_claim(CONNECTION_ALARM_NUM);
+                hardware_alarm_set_callback(CONNECTION_ALARM_NUM, Some(on_connection_alarm));
+                hardware_alarm_set_target(CONNECTION_ALARM_NUM, connection_gone_time);
+            }
         }
 
         match self.connection.as_mut() {
@@ -338,3 +355,11 @@ unsafe extern "C" fn on_uart0_rx() {
         }
     }
 }
+
+unsafe extern "C" fn on_connection_alarm(alarm_num: u32) {
+    if alarm_num == CONNECTION_ALARM_NUM {
+        critical::run(|cs| state::store(cs, state::ProgramState::WaitForModeSelect));
+        hardware_alarm_unclaim(CONNECTION_ALARM_NUM);
+    }
+}
+
