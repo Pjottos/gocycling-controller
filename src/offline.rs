@@ -8,7 +8,7 @@ use serde::Serialize;
 
 static mut CURRENT_BULK: BulkCycleData = BulkCycleData::new();
 
-const OFFLINE_MODE_HUE: u8 = 220;
+const OFFLINE_MODE_HUE: u8 = 190;
 
 pub struct BulkFull;
 
@@ -16,6 +16,7 @@ pub struct BulkFull;
 pub struct BulkCycleData {
     millis: u32,
     cycle_count: u16,
+    session_flags: SessionFlags,
 }
 
 impl BulkCycleData {
@@ -23,6 +24,7 @@ impl BulkCycleData {
         Self {
             millis: 0,
             cycle_count: 0,
+            session_flags: SessionFlags::empty(),
         }
     }
 
@@ -37,6 +39,14 @@ impl BulkCycleData {
         self.millis = millis_result.0;
 
         Ok(())
+    }
+}
+
+bitflags! {
+    #[derive(Serialize)]
+    struct SessionFlags: u8 {
+        const STARTED_ONLINE = 1 << 0;
+        const CLOSE_SESSION = 1 << 1;
     }
 }
 
@@ -59,6 +69,10 @@ pub fn save_session_and_start_new(_: &CriticalSection) {
 }
 
 pub fn continue_session(cs: &CriticalSection, session: BulkCycleData) {
-    state::store(cs, ProgramState::Running { status_hue: OFFLINE_MODE_HUE });
+    state::store(
+        cs,
+        ProgramState::Running {
+            status_hue: OFFLINE_MODE_HUE,
+        },
+    );
 }
-

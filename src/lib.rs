@@ -4,6 +4,9 @@
 use crate::{binding::*, host::HostInterface, state::ProgramState};
 use core::panic::PanicInfo;
 
+#[macro_use]
+extern crate bitflags;
+
 mod binding;
 mod ctypes;
 
