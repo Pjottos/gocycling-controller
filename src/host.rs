@@ -82,41 +82,38 @@ impl RxCommand {
 }
 
 enum TxCommand {
-    NotifyBulkDataAvailable { item_count: u16 },
     BulkData(BulkCycleData),
     LiveData(CycleData),
 }
 
 impl TxCommand {
     const MAX_CMD_SIZE: usize = 16;
-    const CMD_START_DATA_SYNC: u8 = 1;
+    const CMD_BULK_DATA: u8 = 1;
     const CMD_LIVE_DATA: u8 = 2;
 
     fn serialize<'a>(self, buf: &'a mut [u8; Self::MAX_CMD_SIZE]) -> Result<&'a mut [u8], Error> {
-        match self {
-            Self::NotifyBulkDataAvailable { item_count } => {
-                buf[0] = Self::CMD_START_DATA_SYNC;
+        let (buf_header, buf_data) = buf.split_at_mut(2);
 
-                let count_bytes = item_count.to_le_bytes();
-                buf[2..4].copy_from_slice(&count_bytes);
+        let data_len = match self {
+			Self::BulkData(data) => {
+				buf_header[0] = Self::CMD_BULK_DATA;
 
-                buf[1] = calc_crc8(&buf[2..4]);
+                let used = postcard::to_slice(&data, buf_data)?;
 
-                Ok(&mut buf[..4])
-            }
+                used.len()
+			},
             Self::LiveData(data) => {
-                let (buf_header, buf_data) = buf.split_at_mut(2);
                 buf_header[0] = Self::CMD_LIVE_DATA;
 
                 let used = postcard::to_slice(&data, buf_data)?;
 
-                buf_header[1] = calc_crc8(used);
-
-                let len = 2 + used.len();
-                Ok(&mut buf[..len])
+                used.len()
             }
-            _ => todo!(),
-        }
+        };
+
+        buf_header[1] = calc_crc8(&buf_data[..data_len]);
+
+        Ok(&mut buf[..2 + data_len])
     }
 }
 
@@ -201,6 +198,10 @@ impl HostInterface {
         // do nothing if not connected, generated cycles will accumulate in the buffer
     }
 
+    pub fn has_connection(&self, _: &CriticalSection) -> bool {
+        self.connection.is_some()
+    }
+
     pub fn connection_changed(&mut self, cs: &CriticalSection, value: bool) {
         if value {
             state::store(cs, state::ProgramState::Running { status_hue: 160 });
@@ -251,7 +252,7 @@ impl HostInterface {
         Ok(())
     }
 
-    fn cmd_start_session(&mut self, _: &CriticalSection, datetime: &mut datetime_t) {
+    fn cmd_start_session(&mut self, cs: &CriticalSection, datetime: &mut datetime_t) {
         if let Some(Connection {
             started,
             connection_lost: false,
@@ -259,8 +260,8 @@ impl HostInterface {
         {
             unsafe {
                 rtc_set_datetime(datetime);
-                cycling::reset();
             }
+            cycling::reset(cs);
             *started = true;
         }
     }

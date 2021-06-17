@@ -38,6 +38,8 @@ pub unsafe extern "C" fn main() -> ! {
     let battery_led: rgb::RgbLed =
         rgb::RgbLed::new(PIN_BATTERY_LED_R, PIN_BATTERY_LED_G, PIN_BATTERY_LED_B);
 
+    let host = host::HOST_INTERFACE.as_mut().unwrap();
+
     let mut rainbow_hue = 0;
     loop {
         let state = critical::run(|cs| state::retrieve(cs));
@@ -64,8 +66,11 @@ pub unsafe extern "C" fn main() -> ! {
                     old_status_hue = status_hue;
                 }
 
-                // TODO: offline mode
-                host::HOST_INTERFACE.as_mut().unwrap().update();
+                if critical::run(|cs| host.has_connection(cs)) {
+					host.update();
+                } else {
+                    critical::run(|cs| offline::update(cs));
+                }
 
                 // enter low power mode until an event occurs (e.g interrupt)
                 asm!("wfe");
