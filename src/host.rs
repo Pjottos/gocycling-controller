@@ -198,6 +198,8 @@ impl HostInterface {
                     // is continued offline a new session will be started right away.
                     connection.session.add_cycle(&item).ok();
                     self.send_cmd(TxCommand::LiveData(item)).unwrap();
+                    self.send_cmd(TxCommand::BulkData(BulkCycleData::new()))
+                        .unwrap();
                 }
                 self.cycle_item_count = 0;
             }
@@ -230,20 +232,20 @@ impl HostInterface {
             hardware_alarm_set_target(CONNECTION_ALARM_NUM, connection_gone_time);
         }
     }
- 
+
     pub fn connection_changed(&mut self, cs: &CriticalSection, value: bool) {
         match self.connection.as_mut() {
             Some(connection) => {
                 connection.connection_lost = !value;
 
-				if connection.connection_lost {
-    				if connection.started {
-        				Self::start_reconnecting(cs);
-   					} else {
-						// no session was active, return to mode select
-						state::store(cs, ProgramState::WaitForModeSelect);
-    				}
-				} else {
+                if connection.connection_lost {
+                    if connection.started {
+                        Self::start_reconnecting(cs);
+                    } else {
+                        // no session was active, return to mode select
+                        state::store(cs, ProgramState::WaitForModeSelect);
+                    }
+                } else {
                     state::store(
                         cs,
                         ProgramState::Running {
@@ -258,8 +260,8 @@ impl HostInterface {
                         hardware_alarm_unclaim(CONNECTION_ALARM_NUM);
                         hardware_alarm_cancel(CONNECTION_ALARM_NUM);
                     }
-				}
-        	},
+                }
+            }
             None => {
                 if value {
                     self.connection = Some(Connection {
@@ -268,16 +270,30 @@ impl HostInterface {
                         session: BulkCycleData::new(),
                     });
 
-                    unsafe {
-                        binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
-                        binding_irq_set_enabled(UART0_IRQ, true);
-
-                        binding_uart_set_irq_enables(self.uart_dev, true, false);
-                    }
-
-                    state::store(cs, ProgramState::Running { status_hue: CONNECTED_HUE });
+                    self.enable_uart_rx_interrupt();
+                    state::store(
+                        cs,
+                        ProgramState::Running {
+                            status_hue: CONNECTED_HUE,
+                        },
+                    );
                 }
             }
+        }
+    }
+
+    fn enable_uart_rx_interrupt(&self) {
+        unsafe {
+            binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
+            binding_irq_set_enabled(UART0_IRQ, true);
+
+            binding_uart_set_irq_enables(self.uart_dev, true, false);
+        }
+    }
+
+    fn disable_uart_rx_interrupt(&self) {
+        unsafe {
+            binding_irq_set_enabled(UART0_IRQ, false);
         }
     }
 
@@ -398,6 +414,7 @@ unsafe extern "C" fn on_connection_alarm(alarm_num: u32) {
                 .unwrap_or(false)
             {
                 let connection = interface.connection.take().unwrap();
+                interface.disable_uart_rx_interrupt();
                 offline::continue_session(cs, connection.session);
             }
         }
