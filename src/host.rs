@@ -197,8 +197,8 @@ impl HostInterface {
                     // the cycles will still be sent over bluetooth and if the session
                     // is continued offline a new session will be started right away.
                     connection.session.add_cycle(&item).ok();
-                    self.send_cmd(TxCommand::LiveData(item)).unwrap();
-                    self.send_cmd(TxCommand::BulkData(BulkCycleData::new()))
+                    // self.send_cmd(TxCommand::LiveData(item)).unwrap();
+                    self.send_cmd(TxCommand::BulkData(*&connection.session))
                         .unwrap();
                 }
                 self.cycle_item_count = 0;

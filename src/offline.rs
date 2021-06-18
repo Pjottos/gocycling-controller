@@ -12,7 +12,7 @@ const OFFLINE_MODE_HUE: u8 = 190;
 
 pub struct BulkFull;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Copy)]
 pub struct BulkCycleData {
     millis: u32,
     cycle_count: u16,
