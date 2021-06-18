@@ -212,6 +212,8 @@ impl HostInterface {
                     // is continued offline a new session will be started right away.
                     connection.session.add_cycle(&item).ok();
                     self.send_cmd(TxCommand::LiveData(item)).unwrap();
+                    self.send_cmd(TxCommand::BulkData(BulkCycleData::new()))
+                        .unwrap();
                 }
                 self.cycle_item_count = 0;
             }
