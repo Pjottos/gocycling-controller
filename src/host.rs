@@ -38,7 +38,8 @@ enum RxCommand {
 impl RxCommand {
     const CMD_START_SESSION: u8 = 1;
     const CMD_STOP_SESSION: u8 = 2;
-    const CMD_CONTINUE_SESSION: u8 = 3;
+    const CMD_PAUSE_SESSION: u8 = 3;
+    const CMD_CONTINUE_SESSION: u8 = 4;
 
     fn expected_len(raw: u8) -> Option<usize> {
         let data_size = match raw {
@@ -58,6 +59,7 @@ impl RxCommand {
 
         if let Some(expected_len) = Self::expected_len(raw[0]) {
             let data = Self::command_data(raw);
+            assert_eq!(raw[0], 2);
             if data.len() != expected_len {
                 return None;
             }
@@ -98,14 +100,14 @@ impl RxCommand {
 }
 
 enum TxCommand {
-    BulkData(BulkCycleData),
     LiveData(CycleData),
+    BulkData(BulkCycleData),
 }
 
 impl TxCommand {
     const MAX_CMD_SIZE: usize = 16;
-    const CMD_BULK_DATA: u8 = 1;
-    const CMD_LIVE_DATA: u8 = 2;
+    const CMD_LIVE_DATA: u8 = 1;
+    const CMD_BULK_DATA: u8 = 2;
 
     fn serialize<'a>(self, buf: &'a mut [u8; Self::MAX_CMD_SIZE]) -> Result<&'a mut [u8], Error> {
         let (buf_header, buf_data) = buf.split_at_mut(2);
