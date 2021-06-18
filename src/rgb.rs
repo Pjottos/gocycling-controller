@@ -1,6 +1,6 @@
 use crate::binding::*;
 
-pub const MAX_BRIGHTNESS: u16 = 0x0FFF;
+pub const MAX_BRIGHTNESS: u16 = 0x0CFF;
 
 pub struct RgbLed {
     r_pin: u32,

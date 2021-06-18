@@ -1,4 +1,4 @@
-use crate::{binding::*, cycling, host::HOST_INTERFACE};
+use crate::{binding::*, critical::CriticalSection, cycling, host::HOST_INTERFACE};
 
 const PIN_MAGNET_SENSOR: u32 = 5;
 const PIN_BATTERY_LEVEL_IN: u32 = 26;
@@ -30,14 +30,17 @@ unsafe extern "C" fn on_gpio(pin: u32, events: u32) {
     let _high_level = (events & GPIO_IRQ_LEVEL_HIGH) != 0;
     let _low_level = (events & GPIO_IRQ_LEVEL_LOW) != 0;
 
+    // we're inside an interrupt handler so we can do this
+    let cs = CriticalSection::new();
+
     match pin {
-        PIN_MAGNET_SENSOR => cycling::handle_cycle(),
+        PIN_MAGNET_SENSOR => cycling::handle_cycle(&cs),
         PIN_CONNECTION_STATE => {
             if let Some(interface) = HOST_INTERFACE.as_mut() {
                 if falling_edge {
-                    interface.connection_changed(true);
+                    interface.connection_changed(&cs, true);
                 } else if rising_edge {
-                    interface.connection_changed(false);
+                    interface.connection_changed(&cs, false);
                 }
             }
         }

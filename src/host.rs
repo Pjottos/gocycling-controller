@@ -1,25 +1,26 @@
 use crate::{
     binding::*,
-    critical,
+    critical::{self, CriticalSection},
     ctypes::c_void,
     cycling::{self, CycleData},
-    state,
+    offline::{self, BulkCycleData},
+    state::{self, ProgramState},
 };
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
 const CONNECTION_ALARM_NUM: u32 = 1;
+const RECONNECT_TIMEOUT_US: u64 = 10_000_000;
 
-#[derive(Clone, Copy)]
-pub enum OperatingMode {
-    Offline,
-    Online { started: bool, connected: bool },
-}
+const CONNECTED_HUE: u8 = 160;
+const RECONNECTING_HUE: u8 = 0;
 
 #[derive(Debug)]
 pub enum Error {
     PostcardError(postcard::Error),
-    NotRunning,
+    NotStarted,
+    NoConnection,
+    BufferFull,
 }
 
 impl From<postcard::Error> for Error {
@@ -28,16 +29,23 @@ impl From<postcard::Error> for Error {
     }
 }
 
-enum Command {
+enum RxCommand {
     StartSession { datetime: datetime_t },
+    StopSession,
+    ContinueSession,
 }
 
-impl Command {
+impl RxCommand {
     const CMD_START_SESSION: u8 = 1;
+    const CMD_STOP_SESSION: u8 = 2;
+    const CMD_PAUSE_SESSION: u8 = 3;
+    const CMD_CONTINUE_SESSION: u8 = 4;
 
     fn expected_len(raw: u8) -> Option<usize> {
         let data_size = match raw {
             Self::CMD_START_SESSION => Some(5),
+            Self::CMD_STOP_SESSION => Some(0),
+            Self::CMD_CONTINUE_SESSION => Some(0),
             _ => None,
         };
 
@@ -45,23 +53,30 @@ impl Command {
     }
 
     fn deserialize(raw: &[u8]) -> Option<Self> {
-        if raw.len() == 0 {
+        if raw.len() < 2 || !Self::verify_crc8(raw) {
             return None;
         }
 
-        let data = Self::command_data(raw);
+        if let Some(expected_len) = Self::expected_len(raw[0]) {
+            let data = Self::command_data(raw);
+            assert_eq!(raw[0], 2);
+            if data.len() != expected_len {
+                return None;
+            }
 
-        match raw[0] {
-            Self::CMD_START_SESSION => {
-                if data.len() != 5 || !Self::verify_crc8(raw) {
-                    None
-                } else {
+            match raw[0] {
+                Self::CMD_START_SESSION => {
                     let bytes = [raw[2], raw[3], raw[4], raw[5], raw[6], 0, 0, 0];
                     let datetime = datetime_t::from_bits(u64::from_le_bytes(bytes));
                     Some(Self::StartSession { datetime })
                 }
+                Self::CMD_STOP_SESSION => Some(Self::StopSession),
+                Self::CMD_CONTINUE_SESSION => Some(Self::ContinueSession),
+                // we got an expected len so the cmd should be valid
+                _ => unreachable!(),
             }
-            _ => None,
+        } else {
+            None
         }
     }
 
@@ -84,15 +99,56 @@ impl Command {
     }
 }
 
+enum TxCommand {
+    LiveData(CycleData),
+    BulkData(BulkCycleData),
+}
+
+impl TxCommand {
+    const MAX_CMD_SIZE: usize = 16;
+    const CMD_LIVE_DATA: u8 = 1;
+    const CMD_BULK_DATA: u8 = 2;
+
+    fn serialize<'a>(self, buf: &'a mut [u8; Self::MAX_CMD_SIZE]) -> Result<&'a mut [u8], Error> {
+        let (buf_header, buf_data) = buf.split_at_mut(2);
+
+        let data_len = match self {
+            Self::BulkData(data) => {
+                buf_header[0] = Self::CMD_BULK_DATA;
+
+                let used = postcard::to_slice(&data, buf_data)?;
+
+                used.len()
+            }
+            Self::LiveData(data) => {
+                buf_header[0] = Self::CMD_LIVE_DATA;
+
+                let used = postcard::to_slice(&data, buf_data)?;
+
+                used.len()
+            }
+        };
+
+        buf_header[1] = calc_crc8(&buf_data[..data_len]);
+
+        Ok(&mut buf[..2 + data_len])
+    }
+}
+
+struct Connection {
+    connection_lost: bool,
+    started: bool,
+    session: BulkCycleData,
+}
+
 pub struct HostInterface {
     uart_dev: *mut c_void,
-    operating_mode: Option<OperatingMode>,
-    lost_connection_buf: [CycleData; Self::LOST_CONNECTION_BUF_SIZE],
-    lost_connection_item_count: usize,
-    connection_lost_time: Option<u64>,
+    cycle_buf: [CycleData; Self::CYCLE_BUF_SIZE],
+    cycle_item_count: usize,
     cmd_receive_buffer: [u8; Self::MAX_COMMAND_SIZE],
     cur_cmd_len: usize,
     expected_cmd_len: usize,
+    connection: Option<Connection>,
 }
 
 impl HostInterface {
@@ -100,7 +156,7 @@ impl HostInterface {
     const TX_PIN: u32 = 0;
     const RX_PIN: u32 = 1;
 
-    const LOST_CONNECTION_BUF_SIZE: usize = 64;
+    const CYCLE_BUF_SIZE: usize = 64;
 
     const MAX_COMMAND_SIZE: usize = 64;
 
@@ -111,7 +167,7 @@ impl HostInterface {
         // execute_at_cmd(uart_dev, b"AT+NAME=GoCycling");
         // the module needs some time to execute the command
         // it only starts executing after the response it seems
-        sleep_ms(50);
+        // sleep_ms(50);
 
         // turn off onboard led
         // execute_at_cmd(uart_dev, b"AT+LED2M=1");
@@ -119,136 +175,182 @@ impl HostInterface {
 
         HOST_INTERFACE = Some(Self {
             uart_dev,
-            operating_mode: None,
-            lost_connection_buf: [CycleData::default(); Self::LOST_CONNECTION_BUF_SIZE],
-            lost_connection_item_count: 0,
-            connection_lost_time: None,
+            cycle_buf: [CycleData::default(); Self::CYCLE_BUF_SIZE],
+            cycle_item_count: 0,
             cmd_receive_buffer: [0u8; Self::MAX_COMMAND_SIZE],
             cur_cmd_len: 0,
             expected_cmd_len: 0,
+            connection: None,
         });
     }
 
-    pub fn push(&mut self, data: &CycleData) -> Result<(), Error> {
-        // copy the operating mode to make sure we're not reading a partially updated value
-        let mode = critical::run(|_| self.operating_mode);
-
-        match mode.ok_or(Error::NotRunning)? {
-            OperatingMode::Offline => todo!(),
-            // TODO: should we return an error here?
-            OperatingMode::Online { started: false, .. } => Ok(()),
-            OperatingMode::Online {
-                started: true,
-                connected,
-            } => unsafe {
-                if connected {
-                    // send any cycles that were generated while the connection was lost
-                    for item in &self.lost_connection_buf[0..self.lost_connection_item_count] {
-                        self.send_data(item)?;
-                    }
-                    self.lost_connection_item_count = 0;
-
-                    self.send_data(data)?;
+    pub fn push_cycle(&mut self, _: &CriticalSection, data: CycleData) -> Result<(), Error> {
+        match self.connection {
+            Some(Connection { started: true, .. }) => {
+                // record cycle data in a buffer that gets emptied in the main loop
+                if self.cycle_item_count < Self::CYCLE_BUF_SIZE {
+                    self.cycle_buf[self.cycle_item_count] = data;
+                    self.cycle_item_count += 1;
+                    Ok(())
                 } else {
-                    // record cycle data in a temporary buffer when the connection is temporarly lost
-                    if self.lost_connection_item_count < Self::LOST_CONNECTION_BUF_SIZE {
-                        self.lost_connection_buf[self.lost_connection_item_count] = *data;
-                        self.lost_connection_item_count += 1;
-                    } else {
-                        // TODO: switch to offline mode?
-                        self.lost_connection_item_count = 0;
-                        critical::run(|_| self.operating_mode = None);
-                    }
+                    Err(Error::BufferFull)
                 }
+            }
+            Some(Connection { started: false, .. }) => Err(Error::NotStarted),
+            None => Err(Error::NoConnection),
+        }
+    }
 
-                Ok(())
+    pub fn update(&mut self) {
+        if let Some(mut connection) = self.connection.take() {
+            if !connection.connection_lost && connection.started {
+                // send any pending cycles
+                for item in self.cycle_buf[0..self.cycle_item_count].iter().copied() {
+                    // in the rare event that the session cannot hold any more cycles,
+                    // discard all cycles that do not fit.
+                    // the cycles will still be sent over bluetooth and if the session
+                    // is continued offline a new session will be started right away.
+                    connection.session.add_cycle(&item).ok();
+                    self.send_cmd(TxCommand::LiveData(item)).unwrap();
+                    self.send_cmd(TxCommand::BulkData(BulkCycleData::new()))
+                        .unwrap();
+                }
+                self.cycle_item_count = 0;
+            }
+
+            self.connection = Some(connection);
+        }
+
+        // do nothing if not connected, generated cycles will accumulate in the buffer
+    }
+
+    pub fn has_connection(&self, _: &CriticalSection) -> bool {
+        self.connection.is_some()
+    }
+
+    fn start_reconnecting(cs: &CriticalSection) {
+        state::store(
+            cs,
+            ProgramState::Running {
+                status_hue: RECONNECTING_HUE,
             },
+        );
+
+        unsafe {
+            let connection_gone_time = absolute_time_t {
+                _private_us_since_boot: time_us_64() + RECONNECT_TIMEOUT_US,
+            };
+
+            hardware_alarm_claim(CONNECTION_ALARM_NUM);
+            hardware_alarm_set_callback(CONNECTION_ALARM_NUM, Some(on_connection_alarm));
+            hardware_alarm_set_target(CONNECTION_ALARM_NUM, connection_gone_time);
         }
     }
 
-    pub fn connection_changed(&mut self, value: bool) {
-        let enable_uart_irq = critical::run(|cs| {
-            if value {
-                state::store(cs, state::ProgramState::Running {
-                    status_hue: 160,
-                });
-            } else {
-                // TODO set alarm to change state to waitformode
-                state::store(cs, state::ProgramState::Running {
-                    status_hue: 0,
-                });
+    pub fn connection_changed(&mut self, cs: &CriticalSection, value: bool) {
+        match self.connection.as_mut() {
+            Some(connection) => {
+                connection.connection_lost = !value;
 
-//                 unsafe {
-//                     hardware_alarm_set_callback(CONNECTION_ALARM_NUM, );
-//                     hardware_alar
-//                 }
-            }
-
-            match self.operating_mode.as_mut() {
-                Some(OperatingMode::Online { connected, .. }) => {
-                    *connected = value;
-                    false
-                }
-                None => {
-                    if value {
-                        self.operating_mode = Some(OperatingMode::Online {
-                            connected: true,
-                            // TODO: tempory until bluetooth rx works properly
-                            started: false,
-                        });
-
-                        true
+                if connection.connection_lost {
+                    if connection.started {
+                        Self::start_reconnecting(cs);
                     } else {
-                        false
+                        // no session was active, return to mode select
+                        state::store(cs, ProgramState::WaitForModeSelect);
+                    }
+                } else {
+                    state::store(
+                        cs,
+                        ProgramState::Running {
+                            status_hue: CONNECTED_HUE,
+                        },
+                    );
+
+                    unsafe {
+                        // cancel alarm, we successfully reconnected
+                        // does nothing if alarm was not set (when a connection is made
+                        // but no session is active)
+                        hardware_alarm_unclaim(CONNECTION_ALARM_NUM);
+                        hardware_alarm_cancel(CONNECTION_ALARM_NUM);
                     }
                 }
-                _ => false,
             }
-        });
+            None => {
+                if value {
+                    self.connection = Some(Connection {
+                        connection_lost: false,
+                        started: false,
+                        session: BulkCycleData::new(),
+                    });
 
-        if enable_uart_irq {
-            unsafe {
-                binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
-                binding_irq_set_enabled(UART0_IRQ, true);
-
-                binding_uart_set_irq_enables(self.uart_dev, true, false);
+                    self.enable_uart_rx_interrupt();
+                    state::store(
+                        cs,
+                        ProgramState::Running {
+                            status_hue: CONNECTED_HUE,
+                        },
+                    );
+                }
             }
         }
     }
 
-    unsafe fn send_data(&self, data: &CycleData) -> Result<(), Error> {
-        let mut buf = [0u8; 20];
-        let (buf_crc, buf_data) = buf.split_at_mut(1);
-        let used = postcard::to_slice(data, buf_data)?;
+    fn enable_uart_rx_interrupt(&self) {
+        unsafe {
+            binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
+            binding_irq_set_enabled(UART0_IRQ, true);
 
-        buf_crc[0] = calc_crc8(used);
-        let len = 1 + used.len();
+            binding_uart_set_irq_enables(self.uart_dev, true, false);
+        }
+    }
 
-        binding_uart_write_blocking(self.uart_dev, buf[0..len].as_ptr(), len as u32);
+    fn disable_uart_rx_interrupt(&self) {
+        unsafe {
+            binding_irq_set_enabled(UART0_IRQ, false);
+        }
+    }
+
+    fn execute_rx_cmd(&mut self, cs: &CriticalSection, cmd: RxCommand) {
+        match cmd {
+            RxCommand::StartSession { mut datetime } => self.cmd_start_session(cs, &mut datetime),
+            RxCommand::StopSession => self.cmd_stop_session(cs),
+            RxCommand::ContinueSession => self.cmd_continue_session(cs),
+        }
+    }
+
+    fn send_cmd(&self, cmd: TxCommand) -> Result<(), Error> {
+        let mut buf = [0u8; TxCommand::MAX_CMD_SIZE];
+        let used = cmd.serialize(&mut buf)?;
+
+        unsafe {
+            binding_uart_write_blocking(self.uart_dev, used.as_ptr(), used.len() as u32);
+        }
 
         Ok(())
     }
 
-    fn execute_cmd(&mut self, cmd: Command) {
-        match cmd {
-            Command::StartSession { mut datetime } => self.cmd_start_session(&mut datetime),
+    fn cmd_start_session(&mut self, cs: &CriticalSection, datetime: &mut datetime_t) {
+        if let Some(Connection {
+            started,
+            connection_lost: false,
+            ..
+        }) = self.connection.as_mut()
+        {
+            unsafe {
+                rtc_set_datetime(datetime);
+            }
+            cycling::reset(cs);
+            *started = true;
         }
     }
 
-    fn cmd_start_session(&mut self, datetime: &mut datetime_t) {
-        critical::run(|_| {
-            if let Some(OperatingMode::Online {
-                started,
-                connected: true,
-            }) = self.operating_mode.as_mut()
-            {
-                unsafe {
-                    rtc_set_datetime(datetime);
-                    cycling::reset();
-                }
-                *started = true;
-            }
-        });
+    fn cmd_stop_session(&mut self, cs: &CriticalSection) {
+        todo!()
+    }
+
+    fn cmd_continue_session(&mut self, cs: &CriticalSection) {
+        todo!()
     }
 }
 
@@ -288,13 +390,16 @@ unsafe fn execute_at_cmd<const S: usize>(uart_dev: *mut c_void, cmd: &[u8; S]) {
 }
 
 unsafe extern "C" fn on_uart0_rx() {
+    // inside interrupt handler
+    let cs = &CriticalSection::new();
+
     if let Some(interface) = HOST_INTERFACE.as_mut() {
         while binding_uart_is_readable(interface.uart_dev) {
             let byte = binding_uart_getc(interface.uart_dev);
 
             // start receiving new command, discarding the byte if it is not a valid command
             if interface.cur_cmd_len == 0 {
-                if let Some(expected) = Command::expected_len(byte) {
+                if let Some(expected) = RxCommand::expected_len(byte) {
                     interface.expected_cmd_len = expected;
                 } else {
                     continue;
@@ -309,14 +414,34 @@ unsafe extern "C" fn on_uart0_rx() {
             if interface.cur_cmd_len == interface.expected_cmd_len {
                 // and try to deserialize it
                 if let Some(cmd) =
-                    Command::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
+                    RxCommand::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
                 {
-                    interface.execute_cmd(cmd);
+                    interface.execute_rx_cmd(cs, cmd);
                 }
 
                 // ready to receive a new command
                 interface.cur_cmd_len = 0;
             }
         }
+    }
+}
+
+unsafe extern "C" fn on_connection_alarm(alarm_num: u32) {
+    let cs = &CriticalSection::new();
+
+    if alarm_num == CONNECTION_ALARM_NUM {
+        if let Some(interface) = HOST_INTERFACE.as_mut() {
+            if interface
+                .connection
+                .as_ref()
+                .map(|c| c.started)
+                .unwrap_or(false)
+            {
+                let connection = interface.connection.take().unwrap();
+                interface.disable_uart_rx_interrupt();
+                offline::continue_session(cs, connection.session);
+            }
+        }
+        hardware_alarm_unclaim(CONNECTION_ALARM_NUM);
     }
 }

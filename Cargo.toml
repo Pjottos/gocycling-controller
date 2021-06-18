@@ -13,6 +13,7 @@ crate-type = ["staticlib"]
 [dependencies]
 serde = { version = "1", default-features = false, features = ["derive"] }
 postcard = "0.7"
+bitflags = "1.2"
 
 
 [build-dependencies]
