@@ -16,7 +16,7 @@ pub struct BulkFull;
 pub struct BulkCycleData {
     millis: u32,
     cycle_count: u16,
-    session_flags: SessionFlags,
+    // session_flags: SessionFlags,
 }
 
 impl BulkCycleData {
@@ -24,7 +24,7 @@ impl BulkCycleData {
         Self {
             millis: 0,
             cycle_count: 0,
-            session_flags: SessionFlags::empty(),
+            // session_flags: SessionFlags::empty(),
         }
     }
 

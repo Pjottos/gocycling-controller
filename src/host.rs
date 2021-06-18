@@ -31,14 +31,20 @@ impl From<postcard::Error> for Error {
 
 enum RxCommand {
     StartSession { datetime: datetime_t },
+    StopSession,
+    ContinueSession,
 }
 
 impl RxCommand {
     const CMD_START_SESSION: u8 = 1;
+    const CMD_STOP_SESSION: u8 = 2;
+    const CMD_CONTINUE_SESSION: u8 = 3;
 
     fn expected_len(raw: u8) -> Option<usize> {
         let data_size = match raw {
             Self::CMD_START_SESSION => Some(5),
+            Self::CMD_STOP_SESSION => Some(0),
+            Self::CMD_CONTINUE_SESSION => Some(0),
             _ => None,
         };
 
@@ -46,23 +52,29 @@ impl RxCommand {
     }
 
     fn deserialize(raw: &[u8]) -> Option<Self> {
-        if raw.len() == 0 {
+        if raw.len() < 2 || !Self::verify_crc8(raw) {
             return None;
         }
 
-        let data = Self::command_data(raw);
+        if let Some(expected_len) = Self::expected_len(raw[0]) {
+            let data = Self::command_data(raw);
+            if data.len() != expected_len {
+                return None;
+            }
 
-        match raw[0] {
-            Self::CMD_START_SESSION => {
-                if data.len() != 5 || !Self::verify_crc8(raw) {
-                    None
-                } else {
+            match raw[0] {
+                Self::CMD_START_SESSION => {
                     let bytes = [raw[2], raw[3], raw[4], raw[5], raw[6], 0, 0, 0];
                     let datetime = datetime_t::from_bits(u64::from_le_bytes(bytes));
                     Some(Self::StartSession { datetime })
                 }
+                Self::CMD_STOP_SESSION => Some(Self::StopSession),
+                Self::CMD_CONTINUE_SESSION => Some(Self::ContinueSession),
+                // we got an expected len so the cmd should be valid
+                _ => unreachable!(),
             }
-            _ => None,
+        } else {
+            None
         }
     }
 
@@ -192,14 +204,12 @@ impl HostInterface {
             if !connection.connection_lost && connection.started {
                 // send any pending cycles
                 for item in self.cycle_buf[0..self.cycle_item_count].iter().copied() {
-                    // in the rare event that the sesison cannot hold any more cycles,
+                    // in the rare event that the session cannot hold any more cycles,
                     // discard all cycles that do not fit.
                     // the cycles will still be sent over bluetooth and if the session
                     // is continued offline a new session will be started right away.
                     connection.session.add_cycle(&item).ok();
-                    // self.send_cmd(TxCommand::LiveData(item)).unwrap();
-                    self.send_cmd(TxCommand::BulkData(*&connection.session))
-                        .unwrap();
+                    self.send_cmd(TxCommand::LiveData(item)).unwrap();
                 }
                 self.cycle_item_count = 0;
             }
@@ -300,6 +310,8 @@ impl HostInterface {
     fn execute_rx_cmd(&mut self, cs: &CriticalSection, cmd: RxCommand) {
         match cmd {
             RxCommand::StartSession { mut datetime } => self.cmd_start_session(cs, &mut datetime),
+            RxCommand::StopSession => self.cmd_stop_session(cs),
+            RxCommand::ContinueSession => self.cmd_continue_session(cs),
         }
     }
 
@@ -327,6 +339,14 @@ impl HostInterface {
             cycling::reset(cs);
             *started = true;
         }
+    }
+
+    fn cmd_stop_session(&mut self, cs: &CriticalSection) {
+        todo!()
+    }
+
+    fn cmd_continue_session(&mut self, cs: &CriticalSection) {
+        todo!()
     }
 }
 
