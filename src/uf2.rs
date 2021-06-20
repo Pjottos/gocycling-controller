@@ -37,8 +37,18 @@ impl Chunk {
             return false;
         }
 
-        let flags =
-            ChunkFlags::from_bits(u32::from_le_bytes([data[8], data[9], data[10], data[11]]));
+        let flags = ChunkFlags::from_bits_truncate(u32::from_le_bytes([
+            data[8], data[9], data[10], data[11],
+        ]));
+
+        if flags.intersects(
+            ChunkFlags::NOT_MAIN_FLASH
+                | ChunkFlags::IS_FILE_CONTAINER
+                | ChunkFlags::HAS_MD5_CHECKSUM
+                | ChunkFlags::HAS_EXTENSION_TAGS,
+        ) {
+            return false;
+        }
 
         true
     }
