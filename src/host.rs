@@ -5,7 +5,10 @@ use crate::{
     cycling::{self, CycleData},
     offline::{self, BulkCycleData},
     state::{self, ProgramState},
+    uf2,
 };
+
+use core::mem;
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
@@ -33,18 +36,21 @@ enum RxCommand {
     StartSession { datetime: datetime_t },
     StopSession,
     ContinueSession,
+    BeginFirmwareUpdate { chunk_count: usize },
 }
 
 impl RxCommand {
     const CMD_START_SESSION: u8 = 1;
     const CMD_STOP_SESSION: u8 = 2;
     const CMD_CONTINUE_SESSION: u8 = 3;
+    const CMD_BEGIN_FIRMWARE_UPDATE: u8 = 5;
 
     fn expected_len(raw: u8) -> Option<usize> {
         let data_size = match raw {
             Self::CMD_START_SESSION => Some(5),
             Self::CMD_STOP_SESSION => Some(0),
             Self::CMD_CONTINUE_SESSION => Some(0),
+            Self::CMD_BEGIN_FIRMWARE_UPDATE => Some(mem::size_of::<usize>()),
             _ => None,
         };
 
@@ -70,6 +76,9 @@ impl RxCommand {
                 }
                 Self::CMD_STOP_SESSION => Some(Self::StopSession),
                 Self::CMD_CONTINUE_SESSION => Some(Self::ContinueSession),
+                Self::CMD_BEGIN_FIRMWARE_UPDATE => Some(Self::BeginFirmwareUpdate {
+                    chunk_count: u32::from_le_bytes([raw[0], raw[1], raw[2], raw[3]]) as usize,
+                }),
                 // we got an expected len so the cmd should be valid
                 _ => unreachable!(),
             }
@@ -312,6 +321,9 @@ impl HostInterface {
             RxCommand::StartSession { mut datetime } => self.cmd_start_session(cs, &mut datetime),
             RxCommand::StopSession => self.cmd_stop_session(cs),
             RxCommand::ContinueSession => self.cmd_continue_session(cs),
+            RxCommand::BeginFirmwareUpdate { chunk_count } => {
+                self.cmd_begin_firmware_update(cs, chunk_count)
+            }
         }
     }
 
@@ -346,6 +358,10 @@ impl HostInterface {
     }
 
     fn cmd_continue_session(&mut self, cs: &CriticalSection) {
+        todo!()
+    }
+
+    fn cmd_begin_firmware_update(&mut self, cs: &CriticalSection, chunk_count: usize) {
         todo!()
     }
 }
