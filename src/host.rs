@@ -59,15 +59,16 @@ impl RxCommand {
 
         if let Some(expected_len) = Self::expected_len(raw[0]) {
             let data = Self::command_data(raw);
-            assert_eq!(raw[0], 2);
-            if data.len() != expected_len {
+
+            if raw.len() != expected_len {
                 return None;
             }
 
             match raw[0] {
                 Self::CMD_START_SESSION => {
-                    let bytes = [raw[2], raw[3], raw[4], raw[5], raw[6], 0, 0, 0];
+                    let bytes = [data[0], data[1], data[2], data[3], data[4], 0, 0, 0];
                     let datetime = datetime_t::from_bits(u64::from_le_bytes(bytes));
+
                     Some(Self::StartSession { datetime })
                 }
                 Self::CMD_STOP_SESSION => Some(Self::StopSession),
@@ -113,13 +114,6 @@ impl TxCommand {
         let (buf_header, buf_data) = buf.split_at_mut(2);
 
         let data_len = match self {
-            Self::BulkData(data) => {
-                buf_header[0] = Self::CMD_BULK_DATA;
-
-                let used = postcard::to_slice(&data, buf_data)?;
-
-                used.len()
-            }
             Self::LiveData(data) => {
                 buf_header[0] = Self::CMD_LIVE_DATA;
 
@@ -127,6 +121,14 @@ impl TxCommand {
 
                 used.len()
             }
+            Self::BulkData(data) => {
+                buf_header[0] = Self::CMD_BULK_DATA;
+
+                let used = postcard::to_slice(&data, buf_data)?;
+
+                used.len()
+            }
+
         };
 
         buf_header[1] = calc_crc8(&buf_data[..data_len]);
@@ -212,9 +214,7 @@ impl HostInterface {
                     // is continued offline a new session will be started right away.
                     connection.session.add_cycle(&item).ok();
                     self.send_cmd(TxCommand::LiveData(item)).unwrap();
-                    self.send_cmd(TxCommand::BulkData(BulkCycleData::new()))
-                        .unwrap();
-                }
+            }
                 self.cycle_item_count = 0;
             }
 

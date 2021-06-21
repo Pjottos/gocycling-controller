@@ -50,10 +50,6 @@ bitflags! {
     }
 }
 
-pub fn update(_: &CriticalSection) {
-    // TODO:
-}
-
 pub fn add_cycle(cs: &CriticalSection, data: &CycleData) {
     unsafe {
         if CURRENT_BULK.add_cycle(data).is_err() {
