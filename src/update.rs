@@ -1,4 +1,4 @@
-use crate::uf2;
+use crate::{uf2, binding::*};
 
 use p256::ecdsa;
 
@@ -57,7 +57,7 @@ impl FirmwareDownloader {
             let chunk_data = self.chunk_buf.as_mut_ptr();
             slice::from_raw_parts_mut(
                 chunk_data as *mut u8,
-                Self::MAX_CHUNK_COUNT * mem::size_of::<uf2::Chunk>(),
+                self.chunk_buf.len() * mem::size_of::<uf2::Chunk>(),
             )
         };
 
@@ -92,6 +92,11 @@ impl FirmwareDownloader {
         } else {
             Status::Progress
         }
+    }
+
+    pub unsafe fn apply_update(&self) -> ! {
+		let _ = binding_save_and_disable_interrupts();
+		todo!();
     }
 
     fn reset_crc(&mut self) {
