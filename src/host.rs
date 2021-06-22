@@ -13,6 +13,7 @@ const CONNECTION_ALARM_NUM: u32 = 1;
 const RECONNECT_TIMEOUT_US: u64 = 10_000_000;
 
 const CONNECTED_HUE: u8 = 160;
+const STARTED_HUE: u8 = 130;
 const RECONNECTING_HUE: u8 = 0;
 
 #[derive(Debug)]
@@ -38,8 +39,7 @@ enum RxCommand {
 impl RxCommand {
     const CMD_START_SESSION: u8 = 1;
     const CMD_STOP_SESSION: u8 = 2;
-    const CMD_PAUSE_SESSION: u8 = 3;
-    const CMD_CONTINUE_SESSION: u8 = 4;
+    const CMD_CONTINUE_SESSION: u8 = 3;
 
     fn expected_len(raw: u8) -> Option<usize> {
         let data_size = match raw {
@@ -128,7 +128,6 @@ impl TxCommand {
 
                 used.len()
             }
-
         };
 
         buf_header[1] = calc_crc8(&buf_data[..data_len]);
@@ -210,11 +209,11 @@ impl HostInterface {
                 for item in self.cycle_buf[0..self.cycle_item_count].iter().copied() {
                     // in the rare event that the session cannot hold any more cycles,
                     // discard all cycles that do not fit.
-                    // the cycles will still be sent over bluetooth and if the session
-                    // is continued offline a new session will be started right away.
+                    // the cycles will still be sent over bluetooth
                     connection.session.add_cycle(&item).ok();
                     self.send_cmd(TxCommand::LiveData(item)).unwrap();
-            }
+                }
+
                 self.cycle_item_count = 0;
             }
 
@@ -278,22 +277,31 @@ impl HostInterface {
             }
             None => {
                 if value {
-                    self.connection = Some(Connection {
-                        connection_lost: false,
-                        started: false,
-                        session: BulkCycleData::new(),
-                    });
-
-                    self.enable_uart_rx_interrupt();
-                    state::store(
-                        cs,
-                        ProgramState::Running {
-                            status_hue: CONNECTED_HUE,
-                        },
-                    );
+                    let offline_session = offline::take_session(cs);
+                    self.start_online(cs, offline_session);
                 }
             }
         }
+    }
+
+    fn start_online(&mut self, cs: &CriticalSection, offline_session: Option<BulkCycleData>) {
+        self.connection = Some(Connection {
+            connection_lost: false,
+            started: false,
+            session: offline_session.unwrap_or(BulkCycleData::new()),
+        });
+
+        self.enable_uart_rx_interrupt();
+        state::store(
+            cs,
+            ProgramState::Running {
+                status_hue: CONNECTED_HUE,
+            },
+        );
+    }
+
+    fn queue_bulk_sync(&mut self, cs: &CriticalSection, bulk: BulkCycleData) {
+        todo!()
     }
 
     fn enable_uart_rx_interrupt(&self) {
@@ -334,7 +342,7 @@ impl HostInterface {
         if let Some(Connection {
             started,
             connection_lost: false,
-            ..
+            session,
         }) = self.connection.as_mut()
         {
             unsafe {
@@ -342,6 +350,9 @@ impl HostInterface {
             }
             cycling::reset(cs);
             *started = true;
+            *session = BulkCycleData::new();
+
+            state::store(cs, ProgramState::Running { status_hue: STARTED_HUE });
         }
     }
 
