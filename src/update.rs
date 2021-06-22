@@ -1,4 +1,4 @@
-use crate::{uf2, binding::*};
+use crate::{binding::*, uf2};
 
 use p256::ecdsa;
 
@@ -9,6 +9,7 @@ pub enum Status {
     ChunkDone,
     Complete,
     ChunkInvalid,
+    CrcFailed,
 }
 
 pub enum Error {
@@ -74,7 +75,8 @@ impl FirmwareDownloader {
             self.reset_crc();
 
             if calc_crc32(chunk_data) != crc {
-                return Status::ChunkInvalid;
+                self.chunk_buf_offset = start;
+                return Status::CrcFailed;
             }
 
             if uf2::Chunk::is_supported_chunk(chunk_data) {
@@ -95,8 +97,8 @@ impl FirmwareDownloader {
     }
 
     pub unsafe fn apply_update(&self) -> ! {
-		let _ = binding_save_and_disable_interrupts();
-		todo!();
+        let _ = binding_save_and_disable_interrupts();
+        todo!();
     }
 
     fn reset_crc(&mut self) {
