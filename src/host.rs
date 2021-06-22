@@ -6,6 +6,7 @@ use crate::{
     offline::{self, BulkCycleData},
     state::{self, ProgramState},
     uf2,
+    update::{self, FirmwareDownloader},
 };
 
 use core::mem;
@@ -41,6 +42,7 @@ enum RxCommand {
 }
 
 impl RxCommand {
+    const MAX_CMD_SIZE: usize = 64;
     const CMD_START_SESSION: u8 = 1;
     const CMD_STOP_SESSION: u8 = 2;
     const CMD_CONTINUE_SESSION: u8 = 3;
@@ -151,13 +153,35 @@ struct Connection {
     session: BulkCycleData,
 }
 
+enum RxMode {
+    DownloadFirmware(FirmwareDownloader),
+    ListenForCommands {
+        cur_cmd_len: usize,
+        expected_cmd_len: usize,
+        cmd_receive_buffer: [u8; RxCommand::MAX_CMD_SIZE],
+    },
+}
+
+impl RxMode {
+    const fn listen_for_commands() -> Self {
+        Self::ListenForCommands {
+            cur_cmd_len: 0,
+            expected_cmd_len: 0,
+            cmd_receive_buffer: [0u8; RxCommand::MAX_CMD_SIZE],
+        }
+    }
+
+    fn download_firmware(expected_chunk_count: usize) -> Result<Self, update::Error> {
+        let downloader = FirmwareDownloader::new(expected_chunk_count)?;
+        Ok(Self::DownloadFirmware(downloader))
+    }
+}
+
 pub struct HostInterface {
     uart_dev: *mut c_void,
     cycle_buf: [CycleData; Self::CYCLE_BUF_SIZE],
     cycle_item_count: usize,
-    cmd_receive_buffer: [u8; Self::MAX_COMMAND_SIZE],
-    cur_cmd_len: usize,
-    expected_cmd_len: usize,
+    rx_mode: Option<RxMode>,
     connection: Option<Connection>,
 }
 
@@ -167,8 +191,6 @@ impl HostInterface {
     const RX_PIN: u32 = 1;
 
     const CYCLE_BUF_SIZE: usize = 64;
-
-    const MAX_COMMAND_SIZE: usize = 64;
 
     pub unsafe fn create() {
         let uart_dev = binding_uart0_init(Self::BAUD_RATE, Self::TX_PIN, Self::RX_PIN);
@@ -187,9 +209,7 @@ impl HostInterface {
             uart_dev,
             cycle_buf: [CycleData::default(); Self::CYCLE_BUF_SIZE],
             cycle_item_count: 0,
-            cmd_receive_buffer: [0u8; Self::MAX_COMMAND_SIZE],
-            cur_cmd_len: 0,
-            expected_cmd_len: 0,
+            rx_mode: Some(RxMode::listen_for_commands()),
             connection: None,
         });
     }
@@ -300,6 +320,8 @@ impl HostInterface {
             session: offline_session.unwrap_or(BulkCycleData::new()),
         });
 
+        self.rx_mode = Some(RxMode::listen_for_commands());
+
         self.enable_uart_rx_interrupt();
         state::store(
             cs,
@@ -364,7 +386,12 @@ impl HostInterface {
             *started = true;
             *session = BulkCycleData::new();
 
-            state::store(cs, ProgramState::Running { status_hue: STARTED_HUE });
+            state::store(
+                cs,
+                ProgramState::Running {
+                    status_hue: STARTED_HUE,
+                },
+            );
         }
     }
 
@@ -421,35 +448,57 @@ unsafe extern "C" fn on_uart0_rx() {
     let cs = &CriticalSection::new();
 
     if let Some(interface) = HOST_INTERFACE.as_mut() {
-        while binding_uart_is_readable(interface.uart_dev) {
-            let byte = binding_uart_getc(interface.uart_dev);
+        let mut rx_mode = interface.rx_mode.take().unwrap();
+        match &mut rx_mode {
+            RxMode::ListenForCommands {
+                cmd_receive_buffer,
+                cur_cmd_len,
+                expected_cmd_len,
+            } => {
+                while binding_uart_is_readable(interface.uart_dev) {
+                    let byte = binding_uart_getc(interface.uart_dev);
 
-            // start receiving new command, discarding the byte if it is not a valid command
-            if interface.cur_cmd_len == 0 {
-                if let Some(expected) = RxCommand::expected_len(byte) {
-                    interface.expected_cmd_len = expected;
-                } else {
-                    continue;
+                    // start receiving new command, discarding the byte if it is not a valid command
+                    if *cur_cmd_len == 0 {
+                        if let Some(expected) = RxCommand::expected_len(byte) {
+                            *expected_cmd_len = expected;
+                        } else {
+                            continue;
+                        }
+                    }
+
+                    // record the current command...
+                    cmd_receive_buffer[*cur_cmd_len] = byte;
+                    *cur_cmd_len += 1;
+
+                    // ... until we got the expected amount of bytes
+                    if *cur_cmd_len == *expected_cmd_len {
+                        // and try to deserialize it
+                        if let Some(cmd) =
+                            RxCommand::deserialize(&cmd_receive_buffer[..*cur_cmd_len])
+                        {
+                            interface.execute_rx_cmd(cs, cmd);
+                        }
+
+                        // ready to receive a new command
+                        *cur_cmd_len = 0;
+                    }
                 }
             }
-
-            // record the current command...
-            interface.cmd_receive_buffer[interface.cur_cmd_len] = byte;
-            interface.cur_cmd_len += 1;
-
-            // ... until we got the expected amount of bytes
-            if interface.cur_cmd_len == interface.expected_cmd_len {
-                // and try to deserialize it
-                if let Some(cmd) =
-                    RxCommand::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
-                {
-                    interface.execute_rx_cmd(cs, cmd);
+            RxMode::DownloadFirmware(downloader) => {
+                while binding_uart_is_readable(interface.uart_dev) {
+                    let byte = binding_uart_getc(interface.uart_dev);
+                    match downloader.feed(byte) {
+                        update::Status::Progress => (),
+                        update::Status::ChunkDone => todo!(),
+                        update::Status::Complete => todo!(),
+                        update::Status::ChunkInvalid => todo!(),
+                        update::Status::CrcFailed => todo!(),
+                    }
                 }
-
-                // ready to receive a new command
-                interface.cur_cmd_len = 0;
             }
         }
+        interface.rx_mode = Some(rx_mode);
     }
 }
 
