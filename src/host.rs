@@ -16,6 +16,7 @@ const CONNECTION_ALARM_NUM: u32 = 1;
 const RECONNECT_TIMEOUT_US: u64 = 10_000_000;
 
 const CONNECTED_HUE: u8 = 160;
+const STARTED_HUE: u8 = 130;
 const RECONNECTING_HUE: u8 = 0;
 
 #[derive(Debug)]
@@ -64,14 +65,16 @@ impl RxCommand {
 
         if let Some(expected_len) = Self::expected_len(raw[0]) {
             let data = Self::command_data(raw);
-            if data.len() != expected_len {
+
+            if raw.len() != expected_len {
                 return None;
             }
 
             match raw[0] {
                 Self::CMD_START_SESSION => {
-                    let bytes = [raw[2], raw[3], raw[4], raw[5], raw[6], 0, 0, 0];
+                    let bytes = [data[0], data[1], data[2], data[3], data[4], 0, 0, 0];
                     let datetime = datetime_t::from_bits(u64::from_le_bytes(bytes));
+
                     Some(Self::StartSession { datetime })
                 }
                 Self::CMD_STOP_SESSION => Some(Self::StopSession),
@@ -107,28 +110,28 @@ impl RxCommand {
 }
 
 enum TxCommand {
-    BulkData(BulkCycleData),
     LiveData(CycleData),
+    BulkData(BulkCycleData),
 }
 
 impl TxCommand {
     const MAX_CMD_SIZE: usize = 16;
-    const CMD_BULK_DATA: u8 = 1;
-    const CMD_LIVE_DATA: u8 = 2;
+    const CMD_LIVE_DATA: u8 = 1;
+    const CMD_BULK_DATA: u8 = 2;
 
     fn serialize<'a>(self, buf: &'a mut [u8; Self::MAX_CMD_SIZE]) -> Result<&'a mut [u8], Error> {
         let (buf_header, buf_data) = buf.split_at_mut(2);
 
         let data_len = match self {
-            Self::BulkData(data) => {
-                buf_header[0] = Self::CMD_BULK_DATA;
+            Self::LiveData(data) => {
+                buf_header[0] = Self::CMD_LIVE_DATA;
 
                 let used = postcard::to_slice(&data, buf_data)?;
 
                 used.len()
             }
-            Self::LiveData(data) => {
-                buf_header[0] = Self::CMD_LIVE_DATA;
+            Self::BulkData(data) => {
+                buf_header[0] = Self::CMD_BULK_DATA;
 
                 let used = postcard::to_slice(&data, buf_data)?;
 
@@ -215,11 +218,11 @@ impl HostInterface {
                 for item in self.cycle_buf[0..self.cycle_item_count].iter().copied() {
                     // in the rare event that the session cannot hold any more cycles,
                     // discard all cycles that do not fit.
-                    // the cycles will still be sent over bluetooth and if the session
-                    // is continued offline a new session will be started right away.
+                    // the cycles will still be sent over bluetooth
                     connection.session.add_cycle(&item).ok();
                     self.send_cmd(TxCommand::LiveData(item)).unwrap();
                 }
+
                 self.cycle_item_count = 0;
             }
 
@@ -283,22 +286,31 @@ impl HostInterface {
             }
             None => {
                 if value {
-                    self.connection = Some(Connection {
-                        connection_lost: false,
-                        started: false,
-                        session: BulkCycleData::new(),
-                    });
-
-                    self.enable_uart_rx_interrupt();
-                    state::store(
-                        cs,
-                        ProgramState::Running {
-                            status_hue: CONNECTED_HUE,
-                        },
-                    );
+                    let offline_session = offline::take_session(cs);
+                    self.start_online(cs, offline_session);
                 }
             }
         }
+    }
+
+    fn start_online(&mut self, cs: &CriticalSection, offline_session: Option<BulkCycleData>) {
+        self.connection = Some(Connection {
+            connection_lost: false,
+            started: false,
+            session: offline_session.unwrap_or(BulkCycleData::new()),
+        });
+
+        self.enable_uart_rx_interrupt();
+        state::store(
+            cs,
+            ProgramState::Running {
+                status_hue: CONNECTED_HUE,
+            },
+        );
+    }
+
+    fn queue_bulk_sync(&mut self, cs: &CriticalSection, bulk: BulkCycleData) {
+        todo!()
     }
 
     fn enable_uart_rx_interrupt(&self) {
@@ -342,7 +354,7 @@ impl HostInterface {
         if let Some(Connection {
             started,
             connection_lost: false,
-            ..
+            session,
         }) = self.connection.as_mut()
         {
             unsafe {
@@ -350,6 +362,9 @@ impl HostInterface {
             }
             cycling::reset(cs);
             *started = true;
+            *session = BulkCycleData::new();
+
+            state::store(cs, ProgramState::Running { status_hue: STARTED_HUE });
         }
     }
 

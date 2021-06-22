@@ -73,8 +73,6 @@ pub unsafe extern "C" fn main() -> ! {
 
                 if critical::run(|cs| host.has_connection(cs)) {
                     host.update();
-                } else {
-                    critical::run(|cs| offline::update(cs));
                 }
 
                 // enter low power mode until an event occurs (e.g interrupt)
