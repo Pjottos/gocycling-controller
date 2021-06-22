@@ -80,7 +80,7 @@ impl RxCommand {
                 Self::CMD_STOP_SESSION => Some(Self::StopSession),
                 Self::CMD_CONTINUE_SESSION => Some(Self::ContinueSession),
                 Self::CMD_BEGIN_FIRMWARE_UPDATE => Some(Self::BeginFirmwareUpdate {
-                    chunk_count: u32::from_le_bytes([raw[0], raw[1], raw[2], raw[3]]) as usize,
+                    chunk_count: u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize,
                 }),
                 // we got an expected len so the cmd should be valid
                 _ => unreachable!(),
