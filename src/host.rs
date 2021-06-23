@@ -11,7 +11,6 @@ use arrayvec::ArrayVec;
 
 use core::mem;
 
-
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
 const CONNECTION_ALARM_NUM: u32 = 1;
@@ -148,7 +147,6 @@ impl TxCommand {
 struct Connection {
     connection_lost: bool,
     started: bool,
-    session: BulkCycleData,
 }
 
 pub struct HostInterface {
@@ -198,13 +196,11 @@ impl HostInterface {
         let result = match &mut connection {
             Some(Connection {
                 started: true,
-                session,
                 ..
             }) => {
                 // in the rare event that the session cannot hold any more cycles,
                 // discard all cycles that do not fit.
                 // the cycles will still be sent over bluetooth
-                session.add_cycle(&data).ok();
                 self.queue_cmd(cs, TxCommand::LiveData(data))?;
                 Ok(())
             }
@@ -283,10 +279,16 @@ impl HostInterface {
                         state::store(cs, ProgramState::WaitForModeSelect);
                     }
                 } else {
+                    let hue = if connection.started {
+                        STARTED_HUE
+                    } else {
+						CONNECTED_HUE
+                    };
+
                     state::store(
                         cs,
                         ProgramState::Running {
-                            status_hue: CONNECTED_HUE,
+                            status_hue: hue,
                         },
                     );
 
@@ -301,21 +303,19 @@ impl HostInterface {
             }
             None => {
                 if value {
-                    let offline_session = offline::take_session(cs);
                     for i in 0..2 {
                         self.tx_cmd_bufs[i].clear();
                     }
-                    self.start_online(cs, offline_session);
+                    self.start_online(cs);
                 }
             }
         }
     }
 
-    fn start_online(&mut self, cs: &CriticalSection, offline_session: Option<BulkCycleData>) {
+    fn start_online(&mut self, cs: &CriticalSection) {
         self.connection = Some(Connection {
             connection_lost: false,
             started: false,
-            session: offline_session.unwrap_or(BulkCycleData::new()),
         });
 
         self.enable_uart_rx_interrupt();
@@ -351,20 +351,18 @@ impl HostInterface {
     }
 
     fn cmd_handshake(&mut self, cs: &CriticalSection, session_active: bool) {
-        let mut connection = self.connection.take();
-
-		if let Some(Connection { started: false, connection_lost: false, session }) = connection {
-			if session_active{
-				self.queue_cmd(cs, TxCommand::BulkData(session));
-				self.cmd_start_session(cs);
-			} else {
-    			self.connection = Some(Connection {
-        			started: false,
-        			connection_lost: false,
-        			session: BulkCycleData::new(),
-    			});
-			}
-		}
+        if let Some(Connection {
+            started: false,
+            connection_lost: false,
+        }) = self.connection
+        {
+            if session_active {
+                if let Some(session) = offline::take_session(cs) {
+                    self.queue_cmd(cs, TxCommand::BulkData(session)).unwrap();
+                }
+                self.cmd_start_session(cs);
+            }
+        }
     }
 
     fn cmd_start_session(&mut self, cs: &CriticalSection) {
@@ -373,7 +371,6 @@ impl HostInterface {
         self.connection = Some(Connection {
             started: true,
             connection_lost: false,
-            session: BulkCycleData::new(),
         });
 
         state::store(
@@ -468,9 +465,9 @@ unsafe extern "C" fn on_connection_alarm(alarm_num: u32) {
                 .map(|c| c.started)
                 .unwrap_or(false)
             {
-                let connection = interface.connection.take().unwrap();
                 interface.disable_uart_rx_interrupt();
-                offline::continue_session(cs, connection.session);
+                interface.connection = None;
+                offline::start(cs);
             }
         }
         hardware_alarm_unclaim(CONNECTION_ALARM_NUM);

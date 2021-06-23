@@ -28,7 +28,7 @@ pub fn handle_cycle(cs: &CriticalSection) {
         if host.has_connection(cs) {
             host.push_cycle(cs, data).ok();
         } else {
-            offline::add_cycle(cs, &data);
+            offline::add_cycle(cs, &data).ok();
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     binding::*,
     critical::{self, CriticalSection},
-    cycling::CycleData,
+    cycling::{self, CycleData},
     state::{self, ProgramState},
 };
 use serde::Serialize;
@@ -62,10 +62,12 @@ pub fn add_cycle(cs: &CriticalSection, data: &CycleData) -> Result<(), Error> {
     }
 }
 
-pub fn continue_session(cs: &CriticalSection, session: BulkCycleData) {
+pub fn start(cs: &CriticalSection) {
     unsafe {
-        CURRENT_BULK = Some(session);
+        CURRENT_BULK = Some(BulkCycleData::new());
     }
+
+    cycling::reset(cs);
 
     state::store(
         cs,
