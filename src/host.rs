@@ -381,7 +381,7 @@ impl HostInterface {
         );
     }
 
-    fn cmd_stop_session(&mut self, cs: &CriticalSection) {
+    fn cmd_stop_session(&mut self, _cs: &CriticalSection) {
         // todo!()
     }
 }

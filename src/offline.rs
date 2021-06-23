@@ -1,6 +1,5 @@
 use crate::{
-    binding::*,
-    critical::{self, CriticalSection},
+    critical::CriticalSection,
     cycling::{self, CycleData},
     state::{self, ProgramState},
 };
@@ -53,7 +52,7 @@ bitflags! {
     }
 }
 
-pub fn add_cycle(cs: &CriticalSection, data: &CycleData) -> Result<(), Error> {
+pub fn add_cycle(_: &CriticalSection, data: &CycleData) -> Result<(), Error> {
     if let Some(bulk) = unsafe { CURRENT_BULK.as_mut() } {
         bulk.add_cycle(data)?;
         Ok(())

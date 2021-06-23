@@ -18,8 +18,6 @@ mod offline;
 mod rgb;
 mod state;
 
-const MODULES_STARTUP_MS: u32 = 250;
-
 const PIN_STATUS_LED_R: u32 = 6;
 const PIN_STATUS_LED_G: u32 = 7;
 const PIN_STATUS_LED_B: u32 = 8;
