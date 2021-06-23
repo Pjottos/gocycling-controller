@@ -357,11 +357,11 @@ impl HostInterface {
     }
 
     fn cmd_stop_session(&mut self, cs: &CriticalSection) {
-        todo!()
+        // todo!()
     }
 
     fn cmd_continue_session(&mut self, cs: &CriticalSection) {
-        todo!()
+        // todo!()
     }
 }
 
