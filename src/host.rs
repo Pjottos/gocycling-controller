@@ -12,6 +12,7 @@ use arrayvec::ArrayVec;
 
 use core::mem;
 
+
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
 const CONNECTION_ALARM_NUM: u32 = 1;
@@ -38,17 +39,20 @@ impl From<postcard::Error> for Error {
 enum RxCommand {
     StartSession { datetime: datetime_t },
     StopSession,
+    Handshake { session_active: bool },
 }
 
 impl RxCommand {
     const MAX_CMD_SIZE: usize = 64;
     const CMD_START_SESSION: u8 = 1;
     const CMD_STOP_SESSION: u8 = 2;
+    const CMD_HANDSHAKE: u8 = 3;
 
     fn expected_len(raw: u8) -> Option<usize> {
         let data_size = match raw {
             Self::CMD_START_SESSION => Some(5),
             Self::CMD_STOP_SESSION => Some(0),
+            Self::CMD_HANDSHAKE => Some(1),
             _ => None,
         };
 
@@ -75,6 +79,13 @@ impl RxCommand {
                     Some(Self::StartSession { datetime })
                 }
                 Self::CMD_STOP_SESSION => Some(Self::StopSession),
+                Self::CMD_HANDSHAKE => {
+                    let flags = data[0];
+
+                    let session_active = (flags & (1 << 0)) != 0;
+
+                    Some(Self::Handshake { session_active })
+                }
                 // we got an expected len so the cmd should be valid
                 _ => unreachable!(),
             }
@@ -162,6 +173,8 @@ impl HostInterface {
 
     const TX_CMD_BUF_SIZE: usize = 64;
 
+    const CMD_SEND_DELAY_MS: u32 = 1;
+
     pub unsafe fn create() {
         let uart_dev = binding_uart0_init(Self::BAUD_RATE, Self::TX_PIN, Self::RX_PIN);
 
@@ -230,6 +243,7 @@ impl HostInterface {
 
                 unsafe {
                     binding_uart_write_blocking(self.uart_dev, used.as_ptr(), used.len() as u32);
+                    sleep_ms(Self::CMD_SEND_DELAY_MS);
                 }
             }
 
@@ -294,6 +308,9 @@ impl HostInterface {
             None => {
                 if value {
                     let offline_session = offline::take_session(cs);
+                    for i in 0..2 {
+                        self.tx_cmd_bufs[i].clear();
+                    }
                     self.start_online(cs, offline_session);
                 }
             }
@@ -335,7 +352,29 @@ impl HostInterface {
         match cmd {
             RxCommand::StartSession { mut datetime } => self.cmd_start_session(cs, &mut datetime),
             RxCommand::StopSession => self.cmd_stop_session(cs),
+            RxCommand::Handshake { session_active } => self.cmd_handshake(cs, session_active),
         }
+    }
+
+    fn cmd_handshake(&mut self, cs: &CriticalSection, session_active: bool) {
+        let mut connection = self.connection.take();
+
+		if let Some(Connection { started: false, connection_lost: false, session }) = connection {
+			if session_active{
+				self.queue_cmd(cs, TxCommand::BulkData(session));
+				self.connection = Some(Connection {
+    				started: true,
+    				connection_lost: false,
+    				session: BulkCycleData::new(),
+				});
+			} else {
+    			self.connection = Some(Connection {
+        			started: false,
+        			connection_lost: false,
+        			session: BulkCycleData::new(),
+    			});
+			}
+		}
     }
 
     fn cmd_start_session(&mut self, cs: &CriticalSection, datetime: &mut datetime_t) {
