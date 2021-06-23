@@ -5,7 +5,12 @@ use crate::{
     cycling::{self, CycleData},
     offline::{self, BulkCycleData},
     state::{self, ProgramState},
+    uf2,
 };
+
+use arrayvec::ArrayVec;
+
+use core::mem;
 
 pub static mut HOST_INTERFACE: Option<HostInterface> = None;
 
@@ -33,19 +38,17 @@ impl From<postcard::Error> for Error {
 enum RxCommand {
     StartSession { datetime: datetime_t },
     StopSession,
-    ContinueSession,
 }
 
 impl RxCommand {
+    const MAX_CMD_SIZE: usize = 64;
     const CMD_START_SESSION: u8 = 1;
     const CMD_STOP_SESSION: u8 = 2;
-    const CMD_CONTINUE_SESSION: u8 = 3;
 
     fn expected_len(raw: u8) -> Option<usize> {
         let data_size = match raw {
             Self::CMD_START_SESSION => Some(5),
             Self::CMD_STOP_SESSION => Some(0),
-            Self::CMD_CONTINUE_SESSION => Some(0),
             _ => None,
         };
 
@@ -72,7 +75,6 @@ impl RxCommand {
                     Some(Self::StartSession { datetime })
                 }
                 Self::CMD_STOP_SESSION => Some(Self::StopSession),
-                Self::CMD_CONTINUE_SESSION => Some(Self::ContinueSession),
                 // we got an expected len so the cmd should be valid
                 _ => unreachable!(),
             }
@@ -106,11 +108,13 @@ enum TxCommand {
 }
 
 impl TxCommand {
-    const MAX_CMD_SIZE: usize = 16;
     const CMD_LIVE_DATA: u8 = 1;
     const CMD_BULK_DATA: u8 = 2;
 
-    fn serialize<'a>(self, buf: &'a mut [u8; Self::MAX_CMD_SIZE]) -> Result<&'a mut [u8], Error> {
+    fn serialize<'a>(
+        self,
+        buf: &'a mut [u8; mem::size_of::<Self>()],
+    ) -> Result<&'a mut [u8], Error> {
         let (buf_header, buf_data) = buf.split_at_mut(2);
 
         let data_len = match self {
@@ -144,11 +148,10 @@ struct Connection {
 
 pub struct HostInterface {
     uart_dev: *mut c_void,
-    cycle_buf: [CycleData; Self::CYCLE_BUF_SIZE],
-    cycle_item_count: usize,
-    cmd_receive_buffer: [u8; Self::MAX_COMMAND_SIZE],
-    cur_cmd_len: usize,
+    tx_cmd_bufs: [ArrayVec<TxCommand, { Self::TX_CMD_BUF_SIZE }>; 2],
+    cur_tx_cmd_buf: usize,
     expected_cmd_len: usize,
+    cmd_receive_buffer: ArrayVec<u8, { mem::size_of::<RxCommand>() }>,
     connection: Option<Connection>,
 }
 
@@ -157,9 +160,7 @@ impl HostInterface {
     const TX_PIN: u32 = 0;
     const RX_PIN: u32 = 1;
 
-    const CYCLE_BUF_SIZE: usize = 64;
-
-    const MAX_COMMAND_SIZE: usize = 64;
+    const TX_CMD_BUF_SIZE: usize = 64;
 
     pub unsafe fn create() {
         let uart_dev = binding_uart0_init(Self::BAUD_RATE, Self::TX_PIN, Self::RX_PIN);
@@ -176,51 +177,66 @@ impl HostInterface {
 
         HOST_INTERFACE = Some(Self {
             uart_dev,
-            cycle_buf: [CycleData::default(); Self::CYCLE_BUF_SIZE],
-            cycle_item_count: 0,
-            cmd_receive_buffer: [0u8; Self::MAX_COMMAND_SIZE],
-            cur_cmd_len: 0,
+            tx_cmd_bufs: [ArrayVec::new(), ArrayVec::new()],
+            cur_tx_cmd_buf: 0,
             expected_cmd_len: 0,
+            cmd_receive_buffer: ArrayVec::new(),
             connection: None,
         });
     }
 
-    pub fn push_cycle(&mut self, _: &CriticalSection, data: CycleData) -> Result<(), Error> {
-        match self.connection {
-            Some(Connection { started: true, .. }) => {
-                // record cycle data in a buffer that gets emptied in the main loop
-                if self.cycle_item_count < Self::CYCLE_BUF_SIZE {
-                    self.cycle_buf[self.cycle_item_count] = data;
-                    self.cycle_item_count += 1;
-                    Ok(())
-                } else {
-                    Err(Error::BufferFull)
-                }
+    pub fn push_cycle(&mut self, cs: &CriticalSection, data: CycleData) -> Result<(), Error> {
+        let mut connection = self.connection.take();
+
+        let result = match &mut connection {
+            Some(Connection {
+                started: true,
+                session,
+                ..
+            }) => {
+                // in the rare event that the session cannot hold any more cycles,
+                // discard all cycles that do not fit.
+                // the cycles will still be sent over bluetooth
+                session.add_cycle(&data).ok();
+                self.queue_cmd(cs, TxCommand::LiveData(data))?;
+                Ok(())
             }
             Some(Connection { started: false, .. }) => Err(Error::NotStarted),
             None => Err(Error::NoConnection),
-        }
+        };
+
+        self.connection = connection;
+        result
+    }
+
+    fn queue_cmd(&mut self, _: &CriticalSection, cmd: TxCommand) -> Result<(), Error> {
+        self.tx_cmd_bufs[self.cur_tx_cmd_buf]
+            .try_push(cmd)
+            .map_err(|_| Error::BufferFull)
     }
 
     pub fn update(&mut self) {
-        if let Some(mut connection) = self.connection.take() {
-            if !connection.connection_lost && connection.started {
-                // send any pending cycles
-                for item in self.cycle_buf[0..self.cycle_item_count].iter().copied() {
-                    // in the rare event that the session cannot hold any more cycles,
-                    // discard all cycles that do not fit.
-                    // the cycles will still be sent over bluetooth
-                    connection.session.add_cycle(&item).ok();
-                    self.send_cmd(TxCommand::LiveData(item)).unwrap();
-                }
+        if let Some(Connection {
+            connection_lost: false,
+            ..
+        }) = self.connection
+        {
+            // send any pending cmds from the buffer not currently being written to in interrupts
+            let last_buf = (self.cur_tx_cmd_buf + 1) % 2;
 
-                self.cycle_item_count = 0;
+            for cmd in self.tx_cmd_bufs[last_buf].drain(..) {
+                let mut buf = [0u8; mem::size_of::<TxCommand>()];
+                let used = cmd.serialize(&mut buf).unwrap();
+
+                unsafe {
+                    binding_uart_write_blocking(self.uart_dev, used.as_ptr(), used.len() as u32);
+                }
             }
 
-            self.connection = Some(connection);
+            critical::run(|_| self.cur_tx_cmd_buf = last_buf);
         }
 
-        // do nothing if not connected, generated cycles will accumulate in the buffer
+        // do nothing if not connected, generated commands will accumulate in the buffer
     }
 
     pub fn has_connection(&self, _: &CriticalSection) -> bool {
@@ -300,10 +316,6 @@ impl HostInterface {
         );
     }
 
-    fn queue_bulk_sync(&mut self, cs: &CriticalSection, bulk: BulkCycleData) {
-        todo!()
-    }
-
     fn enable_uart_rx_interrupt(&self) {
         unsafe {
             binding_irq_set_exclusive_handler(UART0_IRQ, Some(on_uart0_rx));
@@ -323,19 +335,7 @@ impl HostInterface {
         match cmd {
             RxCommand::StartSession { mut datetime } => self.cmd_start_session(cs, &mut datetime),
             RxCommand::StopSession => self.cmd_stop_session(cs),
-            RxCommand::ContinueSession => self.cmd_continue_session(cs),
         }
-    }
-
-    fn send_cmd(&self, cmd: TxCommand) -> Result<(), Error> {
-        let mut buf = [0u8; TxCommand::MAX_CMD_SIZE];
-        let used = cmd.serialize(&mut buf)?;
-
-        unsafe {
-            binding_uart_write_blocking(self.uart_dev, used.as_ptr(), used.len() as u32);
-        }
-
-        Ok(())
     }
 
     fn cmd_start_session(&mut self, cs: &CriticalSection, datetime: &mut datetime_t) {
@@ -352,15 +352,16 @@ impl HostInterface {
             *started = true;
             *session = BulkCycleData::new();
 
-            state::store(cs, ProgramState::Running { status_hue: STARTED_HUE });
+            state::store(
+                cs,
+                ProgramState::Running {
+                    status_hue: STARTED_HUE,
+                },
+            );
         }
     }
 
     fn cmd_stop_session(&mut self, cs: &CriticalSection) {
-        // todo!()
-    }
-
-    fn cmd_continue_session(&mut self, cs: &CriticalSection) {
         // todo!()
     }
 }
@@ -407,9 +408,8 @@ unsafe extern "C" fn on_uart0_rx() {
     if let Some(interface) = HOST_INTERFACE.as_mut() {
         while binding_uart_is_readable(interface.uart_dev) {
             let byte = binding_uart_getc(interface.uart_dev);
-
             // start receiving new command, discarding the byte if it is not a valid command
-            if interface.cur_cmd_len == 0 {
+            if interface.cmd_receive_buffer.is_empty() {
                 if let Some(expected) = RxCommand::expected_len(byte) {
                     interface.expected_cmd_len = expected;
                 } else {
@@ -418,20 +418,17 @@ unsafe extern "C" fn on_uart0_rx() {
             }
 
             // record the current command...
-            interface.cmd_receive_buffer[interface.cur_cmd_len] = byte;
-            interface.cur_cmd_len += 1;
+            interface.cmd_receive_buffer.push(byte);
 
             // ... until we got the expected amount of bytes
-            if interface.cur_cmd_len == interface.expected_cmd_len {
+            if interface.cmd_receive_buffer.len() == interface.expected_cmd_len {
                 // and try to deserialize it
-                if let Some(cmd) =
-                    RxCommand::deserialize(&interface.cmd_receive_buffer[..interface.cur_cmd_len])
-                {
+                if let Some(cmd) = RxCommand::deserialize(&interface.cmd_receive_buffer) {
                     interface.execute_rx_cmd(cs, cmd);
                 }
 
                 // ready to receive a new command
-                interface.cur_cmd_len = 0;
+                interface.cmd_receive_buffer.clear();
             }
         }
     }
