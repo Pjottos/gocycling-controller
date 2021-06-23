@@ -5,7 +5,6 @@ use crate::{
     cycling::{self, CycleData},
     offline::{self, BulkCycleData},
     state::{self, ProgramState},
-    uf2,
 };
 
 use arrayvec::ArrayVec;
@@ -37,20 +36,20 @@ impl From<postcard::Error> for Error {
 }
 
 enum RxCommand {
-    StartSession { datetime: datetime_t },
+    StartSession,
     StopSession,
     Handshake { session_active: bool },
 }
 
 impl RxCommand {
-    const MAX_CMD_SIZE: usize = 64;
+    const BUF_SIZE: usize = 2 + mem::size_of::<Self>();
     const CMD_START_SESSION: u8 = 1;
     const CMD_STOP_SESSION: u8 = 2;
     const CMD_HANDSHAKE: u8 = 3;
 
     fn expected_len(raw: u8) -> Option<usize> {
         let data_size = match raw {
-            Self::CMD_START_SESSION => Some(5),
+            Self::CMD_START_SESSION => Some(0),
             Self::CMD_STOP_SESSION => Some(0),
             Self::CMD_HANDSHAKE => Some(1),
             _ => None,
@@ -72,12 +71,7 @@ impl RxCommand {
             }
 
             match raw[0] {
-                Self::CMD_START_SESSION => {
-                    let bytes = [data[0], data[1], data[2], data[3], data[4], 0, 0, 0];
-                    let datetime = datetime_t::from_bits(u64::from_le_bytes(bytes));
-
-                    Some(Self::StartSession { datetime })
-                }
+                Self::CMD_START_SESSION => Some(Self::StartSession),
                 Self::CMD_STOP_SESSION => Some(Self::StopSession),
                 Self::CMD_HANDSHAKE => {
                     let flags = data[0];
@@ -162,7 +156,7 @@ pub struct HostInterface {
     tx_cmd_bufs: [ArrayVec<TxCommand, { Self::TX_CMD_BUF_SIZE }>; 2],
     cur_tx_cmd_buf: usize,
     expected_cmd_len: usize,
-    cmd_receive_buffer: ArrayVec<u8, { mem::size_of::<RxCommand>() }>,
+    cmd_receive_buffer: ArrayVec<u8, { RxCommand::BUF_SIZE }>,
     connection: Option<Connection>,
 }
 
@@ -350,7 +344,7 @@ impl HostInterface {
 
     fn execute_rx_cmd(&mut self, cs: &CriticalSection, cmd: RxCommand) {
         match cmd {
-            RxCommand::StartSession { mut datetime } => self.cmd_start_session(cs, &mut datetime),
+            RxCommand::StartSession => self.cmd_start_session(cs),
             RxCommand::StopSession => self.cmd_stop_session(cs),
             RxCommand::Handshake { session_active } => self.cmd_handshake(cs, session_active),
         }
@@ -362,11 +356,7 @@ impl HostInterface {
 		if let Some(Connection { started: false, connection_lost: false, session }) = connection {
 			if session_active{
 				self.queue_cmd(cs, TxCommand::BulkData(session));
-				self.connection = Some(Connection {
-    				started: true,
-    				connection_lost: false,
-    				session: BulkCycleData::new(),
-				});
+				self.cmd_start_session(cs);
 			} else {
     			self.connection = Some(Connection {
         			started: false,
@@ -377,27 +367,21 @@ impl HostInterface {
 		}
     }
 
-    fn cmd_start_session(&mut self, cs: &CriticalSection, datetime: &mut datetime_t) {
-        if let Some(Connection {
-            started,
-            connection_lost: false,
-            session,
-        }) = self.connection.as_mut()
-        {
-            unsafe {
-                rtc_set_datetime(datetime);
-            }
-            cycling::reset(cs);
-            *started = true;
-            *session = BulkCycleData::new();
+    fn cmd_start_session(&mut self, cs: &CriticalSection) {
+        cycling::reset(cs);
 
-            state::store(
-                cs,
-                ProgramState::Running {
-                    status_hue: STARTED_HUE,
-                },
-            );
-        }
+        self.connection = Some(Connection {
+            started: true,
+            connection_lost: false,
+            session: BulkCycleData::new(),
+        });
+
+        state::store(
+            cs,
+            ProgramState::Running {
+                status_hue: STARTED_HUE,
+            },
+        );
     }
 
     fn cmd_stop_session(&mut self, cs: &CriticalSection) {

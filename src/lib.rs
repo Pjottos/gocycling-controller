@@ -17,7 +17,6 @@ mod interrupt;
 mod offline;
 mod rgb;
 mod state;
-mod uf2;
 
 const MODULES_STARTUP_MS: u32 = 250;
 

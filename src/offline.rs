@@ -32,7 +32,7 @@ impl BulkCycleData {
     }
 
     pub fn add_cycle(&mut self, data: &CycleData) -> Result<(), Error> {
-        let millis_result = self.millis.overflowing_add(data.micros / 1000);
+        let millis_result = self.millis.overflowing_add(data.millis);
 
         if self.cycle_count == u16::MAX || millis_result.1 {
             return Err(Error::BulkFull);
